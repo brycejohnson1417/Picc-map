@@ -2,9 +2,8 @@ import { Dispensary, PPPStatus } from '../types';
 
 export const getSheetData = async (): Promise<Dispensary[]> => {
   const sheetId = localStorage.getItem('google_sheet_id');
-  const apiKey = localStorage.getItem('google_api_key');
   
-  if (!sheetId || !apiKey) {
+  if (!sheetId) {
     return [];
   }
 

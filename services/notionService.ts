@@ -11,19 +11,12 @@ export interface NotionResponse {
  * PROXY HELPER
  * Calls our own backend server (/api/notion) which forwards the request to Notion.
  */
-const callNotionProxy = async (endpoint: string, method: string, body?: any, tokenOverride?: string) => {
-  const apiKey = tokenOverride || localStorage.getItem('notion_api_key');
-  
-  if (!apiKey) {
-    throw new Error("Missing Notion API Key");
-  }
-
-  // Build the Fetch Options Object safely
+const callNotionProxy = async (endpoint: string, method: string, body?: any) => {
+  // Auth is handled server-side via NOTION_API_KEY.
   const options: RequestInit = {
-    method: method,
+    method,
     headers: {
       'Content-Type': 'application/json',
-      'X-Notion-Token': apiKey,
     },
   };
 
@@ -103,22 +96,18 @@ const mapInternalToNotionProperties = (page: Partial<NotionPage>) => {
 
 /**
  * Validates connection and returns Bot Info
- * Returns object with success status and data/error
  */
-export const validateNotionToken = async (apiKey: string): Promise<{ success: boolean; bot?: NotionBot; error?: string }> => {
+export const validateNotionToken = async (): Promise<NotionBot | null> => {
   try {
-    const data = await callNotionProxy('/users/me', 'GET', undefined, apiKey);
+    const data = await callNotionProxy('/users/me', 'GET');
     return {
-      success: true,
-      bot: {
-        name: data.name,
-        icon: data.avatar_url || '🤖',
-        workspaceName: data.bot?.owner?.workspace ? 'Notion Workspace' : undefined 
-      }
+      name: data.name,
+      icon: data.avatar_url || '🤖',
+      workspaceName: data.bot?.owner?.workspace ? 'Notion Workspace' : undefined,
     };
-  } catch (error: any) {
-    console.error("Token Validation Error:", error);
-    return { success: false, error: error.message };
+  } catch (error) {
+    console.error("Notion Connection Error:", error);
+    return null;
   }
 };
 
@@ -126,7 +115,7 @@ export const validateNotionToken = async (apiKey: string): Promise<{ success: bo
  * SEARCH DATABASES
  * Returns a list of all databases the integration has access to
  */
-export const searchDatabases = async (apiKey: string): Promise<NotionDatabase[]> => {
+export const searchDatabases = async (): Promise<NotionDatabase[]> => {
     try {
         const data = await callNotionProxy('/search', 'POST', {
             filter: {
@@ -137,7 +126,7 @@ export const searchDatabases = async (apiKey: string): Promise<NotionDatabase[]>
                 direction: 'descending',
                 timestamp: 'last_edited_time'
             }
-        }, apiKey);
+        });
 
         return data.results.map((db: any) => ({
             id: db.id,
@@ -152,11 +141,10 @@ export const searchDatabases = async (apiKey: string): Promise<NotionDatabase[]>
     }
 };
 
-export const validateNotionConnection = async (apiKey: string, dbId: string): Promise<boolean> => {
+export const validateNotionConnection = async (dbId: string): Promise<boolean> => {
   try {
     const response = await fetch(`/api/notion/databases/${dbId}`, {
       method: 'GET',
-      headers: { 'X-Notion-Token': apiKey }
     });
     return response.ok;
   } catch (error) {

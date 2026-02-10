@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -34,11 +35,10 @@ app.all('/api/notion/*', async (req, res) => {
     const notionPath = req.params[0]; 
     const notionUrl = `https://api.notion.com/v1/${notionPath}`;
     
-    const apiKey = req.headers['x-notion-token'];
+    const apiKey = process.env.NOTION_API_KEY;
 
     if (!apiKey) {
-        console.error('Request missing x-notion-token header');
-        return res.status(401).json({ error: 'Missing Notion API Key in headers' });
+        return res.status(500).json({ error: 'Server missing NOTION_API_KEY' });
     }
 
     try {
@@ -46,7 +46,7 @@ app.all('/api/notion/*', async (req, res) => {
             method: req.method,
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                'Notion-Version': '2022-06-28',
+                'Notion-Version': '2025-09-03',
                 'Content-Type': 'application/json',
             },
         };
@@ -87,10 +87,10 @@ app.all('/api/notion/*', async (req, res) => {
 // --- GOOGLE SHEETS PROXY ENDPOINT ---
 app.get('/api/sheets/:sheetId/values/:range', async (req, res) => {
     const { sheetId, range } = req.params;
-    const apiKey = req.headers['x-google-api-key'];
+    const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
 
     if (!apiKey) {
-        return res.status(401).json({ error: 'Missing Google API Key' });
+        return res.status(500).json({ error: 'Server missing GOOGLE_SHEETS_API_KEY' });
     }
 
     const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
