@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Check, AlertCircle, Database, Key, Wifi, XCircle, ArrowRight, RefreshCw, ChevronRight, Search, ShieldCheck, FileSpreadsheet } from 'lucide-react';
+import { Save, Check, AlertCircle, Database, Key, Wifi, XCircle, ArrowRight, RefreshCw, ChevronRight, Search, ShieldCheck, FileSpreadsheet, ExternalLink } from 'lucide-react';
 import { validateNotionToken, searchDatabases } from '../services/notionService';
 import { NotionDatabase, NotionBot } from '../types';
 
@@ -27,8 +27,8 @@ export const Settings: React.FC = () => {
     const storedDb = localStorage.getItem('notion_db_id');
     if (storedKey) {
         setApiKey(storedKey);
-        validateNotionToken(storedKey).then(info => {
-            if (info) setBotInfo(info);
+        validateNotionToken(storedKey).then(result => {
+            if (result.success && result.bot) setBotInfo(result.bot);
         });
     }
     if (storedDb) setDbId(storedDb);
@@ -42,13 +42,15 @@ export const Settings: React.FC = () => {
     setError(null);
     setIsLoading(true);
     
-    const bot = await validateNotionToken(apiKey);
-    if (!bot) {
-        setError("Invalid Integration Token. Please check the secret key.");
+    const result = await validateNotionToken(apiKey);
+    
+    if (!result.success) {
+        setError(result.error || "Connection failed. Is the backend server running?");
         setIsLoading(false);
         return;
     }
-    setBotInfo(bot);
+    
+    if (result.bot) setBotInfo(result.bot);
 
     const dbs = await searchDatabases(apiKey);
     setDatabases(dbs);
@@ -65,6 +67,17 @@ export const Settings: React.FC = () => {
 
   const handleSelectDatabase = (id: string) => {
     setDbId(id);
+  };
+
+  const handleSheetIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      // Simple regex to extract ID from URL if user pastes full URL
+      const match = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (match && match[1]) {
+          setSheetId(match[1]);
+      } else {
+          setSheetId(val);
+      }
   };
 
   const handleFinalSave = () => {
@@ -144,7 +157,8 @@ export const Settings: React.FC = () => {
                             </div>
                             {error && (
                                 <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">
-                                    <XCircle size={16} /> {error}
+                                    <XCircle size={16} /> 
+                                    <span className="flex-1">{error}</span>
                                 </div>
                             )}
 
@@ -240,13 +254,13 @@ export const Settings: React.FC = () => {
 
                 <div className="space-y-6 max-w-lg">
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1">Google Sheet ID</label>
-                        <div className="text-[10px] text-slate-400 mb-2">Found in the URL: docs.google.com/spreadsheets/d/<b>[ID_HERE]</b>/edit</div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Google Sheet ID or URL</label>
+                        <div className="text-[10px] text-slate-400 mb-2">Paste the full URL or just the ID (e.g. 1BxiM...EgyJo4)</div>
                         <input 
                             type="text" 
                             value={sheetId}
-                            onChange={(e) => setSheetId(e.target.value)}
-                            placeholder="1BxiMvs0XRA5nFMdKvBdBZjgmUUqptlbs74dg_EgyJo4"
+                            onChange={handleSheetIdChange}
+                            placeholder="https://docs.google.com/spreadsheets/d/..."
                             className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all font-mono text-sm"
                         />
                     </div>
@@ -263,13 +277,11 @@ export const Settings: React.FC = () => {
                     </div>
 
                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-xs text-slate-600 space-y-2">
-                        <p className="font-semibold">Setup Instructions:</p>
-                        <ol className="list-decimal pl-4 space-y-1">
-                            <li>Create a project in Google Cloud Console.</li>
-                            <li>Enable <strong>Google Sheets API</strong> library.</li>
-                            <li>Create Credentials > <strong>API Key</strong>.</li>
-                            <li>Share your Sheet with "Anyone with the link can view" (or restrict key to this domain).</li>
-                        </ol>
+                        <p className="font-semibold flex items-center gap-1"><AlertCircle size={12} className="text-amber-500" /> Important Requirement:</p>
+                        <p>
+                            Because we are using an API Key, your Google Sheet must be set to <strong>"Anyone with the link"</strong> can <strong>View</strong>. 
+                            If your company policy forbids this, you must use a Service Account (requires backend changes).
+                        </p>
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 text-right">

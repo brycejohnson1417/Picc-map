@@ -21,7 +21,14 @@ export const getSheetData = async (): Promise<Dispensary[]> => {
     });
 
     if (!response.ok) {
-      throw new Error(`Sheets API Error: ${response.statusText}`);
+      // Try to get specific error from Google API via Proxy
+      const errJson = await response.json().catch(() => null);
+      const errMsg = errJson?.error?.message || response.statusText;
+      
+      if (response.status === 403) {
+          throw new Error("Access Denied: Is the sheet shared with 'Anyone with the link'?");
+      }
+      throw new Error(`Sheets API Error (${response.status}): ${errMsg}`);
     }
 
     const json = await response.json();

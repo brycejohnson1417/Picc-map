@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Dispensary, PPPStatus } from '../types';
 import { MOCK_DISPENSARIES } from '../constants';
-import { KanbanSquare, MoreHorizontal, MapPin, User, AlertTriangle, ArrowRight, RefreshCw, Database } from 'lucide-react';
+import { KanbanSquare, MoreHorizontal, MapPin, User, AlertTriangle, ArrowRight, RefreshCw, Database, XCircle } from 'lucide-react';
 import { getSheetData } from '../services/sheetsService';
 
 export const PPPOnboarding: React.FC = () => {
   const [dispensaries, setDispensaries] = useState<Dispensary[]>(MOCK_DISPENSARIES);
   const [isLoading, setIsLoading] = useState(false);
   const [dataSource, setDataSource] = useState<'mock' | 'sheet'>('mock');
+  const [error, setError] = useState<string | null>(null);
 
   const statuses: PPPStatus[] = [
     'Not Started',
@@ -19,6 +20,7 @@ export const PPPOnboarding: React.FC = () => {
 
   const fetchLiveStats = async () => {
     setIsLoading(true);
+    setError(null);
     try {
         const sheetData = await getSheetData();
         if (sheetData.length > 0) {
@@ -27,8 +29,10 @@ export const PPPOnboarding: React.FC = () => {
         } else {
             console.log("No sheet data returned, sticking to mock.");
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error("Error loading sheet data", e);
+        setError(e.message || "Failed to load Sheet data.");
+        setDataSource('mock'); // Fallback
     } finally {
         setIsLoading(false);
     }
@@ -68,18 +72,25 @@ export const PPPOnboarding: React.FC = () => {
             </div>
         </div>
         
-        <div className="flex items-center gap-2">
-            <div className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 ${dataSource === 'sheet' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                <Database size={14} /> {dataSource === 'sheet' ? 'Live Sheets Data' : 'Demo Data'}
+        <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+                <div className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 ${dataSource === 'sheet' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <Database size={14} /> {dataSource === 'sheet' ? 'Live Sheets Data' : 'Demo Data'}
+                </div>
+                <button 
+                    onClick={fetchLiveStats}
+                    disabled={isLoading}
+                    className="p-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-slate-600 transition-colors disabled:opacity-50"
+                    title="Sync from Google Sheets"
+                >
+                    <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+                </button>
             </div>
-            <button 
-                onClick={fetchLiveStats}
-                disabled={isLoading}
-                className="p-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-slate-600 transition-colors disabled:opacity-50"
-                title="Sync from Google Sheets"
-            >
-                <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-            </button>
+            {error && (
+                <div className="text-xs text-red-600 flex items-center gap-1 bg-red-50 px-2 py-1 rounded border border-red-100 max-w-xs">
+                    <XCircle size={12} className="shrink-0" /> {error}
+                </div>
+            )}
         </div>
       </div>
 

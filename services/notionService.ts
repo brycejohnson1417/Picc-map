@@ -38,23 +38,38 @@ const callNotionProxy = async (endpoint: string, method: string, body?: any, tok
     // Handle HTML responses (e.g. 404 from Vite if Proxy isn't working)
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") === -1) {
-       throw new Error("Received non-JSON response. Ensure your backend server is running and Proxy is configured.");
+       // If it's not JSON, it's likely a Vite/Server error page
+       throw new Error("Server not reachable. Please run 'node server.js' in a new terminal.");
     }
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorMessage = `Proxy Error: ${response.status} ${response.statusText}`;
+      
       // Try to parse clean error from JSON if possible
       try {
           const jsonErr = JSON.parse(errorText);
-          throw new Error(`Notion API Error: ${jsonErr.message || jsonErr.error || response.statusText}`);
+          // Notion usually returns { object: 'error', message: '...' }
+          if (jsonErr.message) {
+              errorMessage = jsonErr.message;
+          } else if (jsonErr.error) {
+              errorMessage = typeof jsonErr.error === 'string' ? jsonErr.error : JSON.stringify(jsonErr.error);
+          }
       } catch (e) {
-          throw new Error(`Proxy Error: ${response.status} ${errorText}`);
+          // If parsing fails, use the raw text if it's short, otherwise generic error
+          if (errorText && errorText.length < 200) {
+              errorMessage = errorText;
+          }
       }
+      throw new Error(errorMessage);
     }
 
     return await response.json();
-  } catch (err) {
-      // Re-throw to be caught by caller
+  } catch (err: any) {
+      // Handle Network Errors (Server down) specifically
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+          throw new Error("Cannot connect to server. Is 'node server.js' running?");
+      }
       throw err;
   }
 };
@@ -88,18 +103,22 @@ const mapInternalToNotionProperties = (page: Partial<NotionPage>) => {
 
 /**
  * Validates connection and returns Bot Info
+ * Returns object with success status and data/error
  */
-export const validateNotionToken = async (apiKey: string): Promise<NotionBot | null> => {
+export const validateNotionToken = async (apiKey: string): Promise<{ success: boolean; bot?: NotionBot; error?: string }> => {
   try {
     const data = await callNotionProxy('/users/me', 'GET', undefined, apiKey);
     return {
-      name: data.name,
-      icon: data.avatar_url || '🤖',
-      workspaceName: data.bot?.owner?.workspace ? 'Notion Workspace' : undefined 
+      success: true,
+      bot: {
+        name: data.name,
+        icon: data.avatar_url || '🤖',
+        workspaceName: data.bot?.owner?.workspace ? 'Notion Workspace' : undefined 
+      }
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Token Validation Error:", error);
-    return null;
+    return { success: false, error: error.message };
   }
 };
 
@@ -176,11 +195,11 @@ export const getNotionDocs = async (): Promise<NotionResponse> => {
 
     return { docs, source: 'api' };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Notion Sync Failed:", error);
     return { 
       docs: MOCK_NOTION_PAGES, 
-      error: `Sync Failed: ${(error as Error).message}`,
+      error: `Sync Failed: ${error.message}`,
       source: 'mock'
     };
   }
@@ -211,9 +230,9 @@ export const createNotionPage = async (page: Partial<NotionPage>): Promise<{ suc
   try {
     const data = await callNotionProxy('/pages', 'POST', payload);
     return { success: true, id: data.id };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create Page Failed:", error);
-    return { success: false, error: (error as Error).message };
+    return { success: false, error: error.message };
   }
 };
 

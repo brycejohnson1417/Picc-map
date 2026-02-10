@@ -15,8 +15,19 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 app.use(express.json());
 
+// Log all requests to debug connections
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Serve Static Files (The React App)
 app.use(express.static(path.join(__dirname, 'dist')));
+
+// --- HEALTH CHECK ---
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date() });
+});
 
 // --- NOTION PROXY ENDPOINT ---
 app.all('/api/notion/*', async (req, res) => {
@@ -26,7 +37,8 @@ app.all('/api/notion/*', async (req, res) => {
     const apiKey = req.headers['x-notion-token'];
 
     if (!apiKey) {
-        return res.status(401).json({ error: 'Missing Notion API Key' });
+        console.error('Request missing x-notion-token header');
+        return res.status(401).json({ error: 'Missing Notion API Key in headers' });
     }
 
     try {
@@ -39,17 +51,36 @@ app.all('/api/notion/*', async (req, res) => {
             },
         };
 
-        if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+        // Forward body only if it's not GET/HEAD and exists
+        if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
             options.body = JSON.stringify(req.body);
         }
 
         const response = await fetch(notionUrl, options);
-        const data = await response.json();
+        
+        // Safely parse response
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('Notion returned non-JSON response:', text.substring(0, 200));
+            data = { 
+                error: 'Upstream Error', 
+                message: 'Received invalid JSON from Notion API',
+                details: text 
+            };
+        }
+        
+        if (!response.ok) {
+            console.error(`Notion API Error (${response.status}):`, JSON.stringify(data));
+        }
+
         res.status(response.status).json(data);
 
     } catch (error) {
-        console.error('Proxy Error:', error);
-        res.status(500).json({ error: 'Internal Server Error forwarding to Notion' });
+        console.error('Proxy Server Error:', error);
+        res.status(500).json({ error: 'Internal Proxy Error: ' + (error.message || 'Unknown') });
     }
 });
 
@@ -66,7 +97,13 @@ app.get('/api/sheets/:sheetId/values/:range', async (req, res) => {
 
     try {
         const response = await fetch(sheetsUrl);
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            data = { error: 'Invalid JSON from Google Sheets', details: text };
+        }
         res.status(response.status).json(data);
     } catch (error) {
         console.error('Sheets Proxy Error:', error);
