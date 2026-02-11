@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { WorkOrder, WorkOrderStatus, UserRole } from '../types';
 import { MOCK_WORK_ORDERS, MOCK_DISPENSARIES } from '../constants';
-import { 
-  ClipboardList, 
-  User, 
-  Archive, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  ClipboardList,
+  User,
+  Archive,
+  AlertCircle,
+  CheckCircle2,
   Clock,
-  Inbox,
-  ArrowRight
+  Inbox
 } from 'lucide-react';
 
 interface WorkOrderSystemProps {
@@ -21,8 +20,8 @@ export const WorkOrderSystem: React.FC<WorkOrderSystemProps> = ({ currentUserRol
   const [tickets, setTickets] = useState<WorkOrder[]>(MOCK_WORK_ORDERS);
 
   // Helper to get dispensary name
-  const getDispensaryName = (id: string) => 
-    MOCK_DISPENSARIES.find(d => d.id === id)?.name || 'Unknown Dispensary';
+  const getDispensaryName = (id: string | undefined) =>
+    !id ? 'Unknown Dispensary' : MOCK_DISPENSARIES.find(d => d.id === id)?.name || 'Unknown Dispensary';
 
   // Filter logic
   const filteredTickets = tickets.filter(ticket => {

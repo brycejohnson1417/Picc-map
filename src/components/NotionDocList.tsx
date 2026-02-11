@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NotionPage } from '../types';
-import { Search, ExternalLink, Clock, Hash, AlertTriangle, RefreshCw, Plus, FilePlus, Check } from 'lucide-react';
+import { ExternalLink, Clock, Hash, AlertTriangle, RefreshCw, Plus, FilePlus, Check } from 'lucide-react';
 import { getNotionDocs, createNotionPage } from '../services/notionService';
 
 interface NotionDocListProps {
@@ -166,10 +166,14 @@ export const NotionDocList: React.FC<NotionDocListProps> = ({ docs: initialDocs 
               </div>
               
               <div className="flex items-center gap-2">
-                 {doc.syncStatus === 'synced' && <Check size={12} className="text-emerald-500" title="Synced with Notion" />}
+                 {doc.syncStatus === 'synced' && (
+                   <div title="Synced with Notion">
+                     <Check size={12} className="text-emerald-500" />
+                   </div>
+                 )}
                  {doc.tags?.slice(0, 2).map(tag => (
                    <span key={tag} className="flex items-center gap-0.5 bg-slate-50 px-1.5 py-0.5 rounded">
-                     <Hash size={10} /> {tag}
+                     <Hash size={10} className="text-slate-400" /> {tag}
                    </span>
                  ))}
               </div>

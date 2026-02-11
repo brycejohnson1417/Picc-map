@@ -1,21 +1,17 @@
 import React, { useState } from 'react';
-import { WorkOrder, UserRole, WorkOrderStatus } from '../types';
+import { WorkOrder, UserRole } from '../types';
 import { MOCK_WORK_ORDERS } from '../constants';
-import { 
-  Inbox, 
-  User, 
-  Phone, 
-  Mail, 
-  MessageSquare, 
-  Slack, 
-  Instagram, 
-  Smile, 
-  Meh, 
-  Frown, 
-  Sparkles, 
-  Clock, 
-  CheckCircle2,
-  MoreHorizontal,
+import {
+  User,
+  Phone,
+  Mail,
+  MessageSquare,
+  Slack,
+  Instagram,
+  Smile,
+  Meh,
+  Frown,
+  Sparkles,
   Plus
 } from 'lucide-react';
 
@@ -23,10 +19,10 @@ interface ServiceWorkspaceProps {
   currentUserRole: UserRole;
 }
 
-export const ServiceWorkspace: React.FC<ServiceWorkspaceProps> = ({ currentUserRole }) => {
+export const ServiceWorkspace: React.FC<ServiceWorkspaceProps> = () => {
   const [activeTab, setActiveTab] = useState<'support' | 'hr'>('support');
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(MOCK_WORK_ORDERS[0].id);
-  const [tickets, setTickets] = useState<WorkOrder[]>(MOCK_WORK_ORDERS);
+  const [tickets] = useState<WorkOrder[]>(MOCK_WORK_ORDERS);
 
   // Filter Logic
   const filteredTickets = tickets.filter(t => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ChevronRight, FileText, MessageCircle, HelpCircle, Package, ArrowRight } from 'lucide-react';
+import { Search, FileText, MessageCircle, HelpCircle, Package, ArrowRight } from 'lucide-react';
 import { MOCK_NOTION_PAGES, MOCK_WORK_ORDERS } from '../constants';
 
 export const CustomerPortal: React.FC = () => {

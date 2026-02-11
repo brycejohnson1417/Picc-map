@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Sparkles, Loader2, Minimize2 } from 'lucide-react';
+import { Send, Sparkles, Loader2, Minimize2 } from 'lucide-react';
 import { generateAIResponse } from '../services/geminiService';
 import { ChatMessage } from '../types';
 

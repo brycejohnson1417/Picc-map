@@ -1,16 +1,17 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
-  PieChart, 
-  Settings, 
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
+  PieChart,
+  Settings,
   LogOut,
   Briefcase,
   HeadphonesIcon,
   KanbanSquare,
   Globe,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardList
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -22,12 +23,12 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setActiveTab, setRole }) => {
-  
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'service-center', label: 'Service Center', icon: HeadphonesIcon },
     { id: 'ppp', label: 'PPP Onboarding', icon: KanbanSquare },
     { id: 'wiki', label: 'Notion Wiki', icon: FileText },
+    { id: 'proposals', label: 'Proposal Builder', icon: ClipboardList },
     { id: 'sales', label: 'Sales CRM', icon: Briefcase },
     { id: 'finance', label: 'Finance Reports', icon: PieChart },
     { id: 'team', label: 'Team Directory', icon: Users },
@@ -49,8 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setAct
             key={item.id}
             onClick={() => setActiveTab(item.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeTab === item.id 
-                ? 'bg-indigo-600 text-white' 
+              activeTab === item.id
+                ? 'bg-indigo-600 text-white'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
@@ -60,17 +61,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setAct
         ))}
 
         <div className="pt-4 mt-4 border-t border-slate-800">
-            <button
-                onClick={() => setActiveTab('admin')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === 'admin' 
-                    ? 'bg-indigo-900 text-indigo-100 border border-indigo-700' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}
-            >
-                <ShieldCheck size={20} />
-                <span className="font-medium">Admin & Audit</span>
-            </button>
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeTab === 'admin'
+                ? 'bg-indigo-900 text-indigo-100 border border-indigo-700'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <ShieldCheck size={20} />
+            <span className="font-medium">Admin & Audit</span>
+          </button>
         </div>
       </nav>
 
@@ -84,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setAct
         </button>
 
         <label className="block text-xs text-slate-500 mb-2 uppercase font-semibold">Switch View (Demo)</label>
-        <select 
+        <select
           value={currentRole}
           onChange={(e) => setRole(e.target.value as UserRole)}
           className="w-full bg-slate-800 text-slate-200 text-sm rounded p-2 border border-slate-700 focus:outline-none focus:border-indigo-500"
@@ -93,12 +94,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setAct
             <option key={role} value={role}>{role}</option>
           ))}
         </select>
-        
-        <button 
+
+        <button
           onClick={() => setActiveTab('settings')}
           className={`w-full flex items-center gap-2 mt-4 px-4 py-2 text-sm rounded-lg transition-colors ${
-            activeTab === 'settings' 
-              ? 'bg-slate-800 text-white' 
+            activeTab === 'settings'
+              ? 'bg-slate-800 text-white'
               : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >

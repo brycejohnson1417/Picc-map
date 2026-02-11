@@ -7,20 +7,14 @@ export interface NotionResponse {
   source: 'api' | 'mock';
 }
 
-/**
- * PROXY HELPER
- * Calls our own backend server (/api/notion) which forwards the request to Notion.
- */
 const callNotionProxy = async (endpoint: string, method: string, body?: any) => {
-  // Auth is handled server-side via NOTION_API_KEY.
   const options: RequestInit = {
-    method,
+    method: method,
     headers: {
       'Content-Type': 'application/json',
     },
   };
 
-  // Only add body if it exists and method is not GET/HEAD to avoid TypeErrors
   if (body && method !== 'GET' && method !== 'HEAD') {
     options.body = JSON.stringify(body);
   }
@@ -28,48 +22,27 @@ const callNotionProxy = async (endpoint: string, method: string, body?: any) => 
   try {
     const response = await fetch(`/api/notion${endpoint}`, options);
 
-    // Handle HTML responses (e.g. 404 from Vite if Proxy isn't working)
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") === -1) {
-       // If it's not JSON, it's likely a Vite/Server error page
-       throw new Error("Server not reachable. Please run 'node server.js' in a new terminal.");
+      throw new Error("Received non-JSON response. Ensure your Vercel deployment has NOTION_API_KEY set.");
     }
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = `Proxy Error: ${response.status} ${response.statusText}`;
-      
-      // Try to parse clean error from JSON if possible
       try {
-          const jsonErr = JSON.parse(errorText);
-          // Notion usually returns { object: 'error', message: '...' }
-          if (jsonErr.message) {
-              errorMessage = jsonErr.message;
-          } else if (jsonErr.error) {
-              errorMessage = typeof jsonErr.error === 'string' ? jsonErr.error : JSON.stringify(jsonErr.error);
-          }
+        const jsonErr = JSON.parse(errorText);
+        throw new Error(`Notion API Error: ${jsonErr.message || jsonErr.error || response.statusText}`);
       } catch (e) {
-          // If parsing fails, use the raw text if it's short, otherwise generic error
-          if (errorText && errorText.length < 200) {
-              errorMessage = errorText;
-          }
+        throw new Error(`Proxy Error: ${response.status} ${errorText}`);
       }
-      throw new Error(errorMessage);
     }
 
     return await response.json();
-  } catch (err: any) {
-      // Handle Network Errors (Server down) specifically
-      if (err instanceof TypeError && err.message === 'Failed to fetch') {
-          throw new Error("Cannot connect to server. Is 'node server.js' running?");
-      }
-      throw err;
+  } catch (err) {
+    throw err;
   }
 };
 
-/**
- * Maps our internal app structure to the specific JSON schema required by Notion's API
- */
 const mapInternalToNotionProperties = (page: Partial<NotionPage>) => {
   const properties: any = {};
 
@@ -94,51 +67,44 @@ const mapInternalToNotionProperties = (page: Partial<NotionPage>) => {
   return properties;
 };
 
-/**
- * Validates connection and returns Bot Info
- */
 export const validateNotionToken = async (): Promise<NotionBot | null> => {
   try {
     const data = await callNotionProxy('/users/me', 'GET');
     return {
       name: data.name,
       icon: data.avatar_url || '🤖',
-      workspaceName: data.bot?.owner?.workspace ? 'Notion Workspace' : undefined,
+      workspaceName: data.bot?.owner?.workspace ? 'Notion Workspace' : undefined
     };
   } catch (error) {
-    console.error("Notion Connection Error:", error);
+    console.error("Token Validation Error:", error);
     return null;
   }
 };
 
-/**
- * SEARCH DATABASES
- * Returns a list of all databases the integration has access to
- */
 export const searchDatabases = async (): Promise<NotionDatabase[]> => {
-    try {
-        const data = await callNotionProxy('/search', 'POST', {
-            filter: {
-                value: 'database',
-                property: 'object'
-            },
-            sort: {
-                direction: 'descending',
-                timestamp: 'last_edited_time'
-            }
-        });
+  try {
+    const data = await callNotionProxy('/search', 'POST', {
+      filter: {
+        value: 'database',
+        property: 'object'
+      },
+      sort: {
+        direction: 'descending',
+        timestamp: 'last_edited_time'
+      }
+    });
 
-        return data.results.map((db: any) => ({
-            id: db.id,
-            title: db.title?.[0]?.plain_text || 'Untitled Database',
-            icon: db.icon?.emoji || '📅',
-            url: db.url,
-            lastEdited: db.last_edited_time
-        }));
-    } catch (error) {
-        console.error("Database Search Error:", error);
-        return [];
-    }
+    return data.results.map((db: any) => ({
+      id: db.id,
+      title: db.title?.[0]?.plain_text || 'Untitled Database',
+      icon: db.icon?.emoji || '📅',
+      url: db.url,
+      lastEdited: db.last_edited_time
+    }));
+  } catch (error) {
+    console.error("Database Search Error:", error);
+    return [];
+  }
 };
 
 export const validateNotionConnection = async (dbId: string): Promise<boolean> => {
@@ -153,29 +119,26 @@ export const validateNotionConnection = async (dbId: string): Promise<boolean> =
   }
 };
 
-/**
- * FETCH (READ): Queries the database
- */
 export const getNotionDocs = async (): Promise<NotionResponse> => {
   const dbId = localStorage.getItem('notion_db_id');
 
   if (!dbId) {
-    return { docs: MOCK_NOTION_PAGES, source: 'mock' }; 
+    return { docs: MOCK_NOTION_PAGES, source: 'mock' };
   }
 
   try {
     const data = await callNotionProxy(`/databases/${dbId}/query`, 'POST', {
       page_size: 100,
-      sorts: [{ property: 'Last Edited', direction: 'descending' }] 
+      sorts: [{ property: 'Last Edited', direction: 'descending' }]
     });
-    
+
     const docs: NotionPage[] = data.results.map((page: any) => ({
       id: page.id,
       title: page.properties?.Name?.title?.[0]?.plain_text || 'Untitled Page',
       category: page.properties?.Category?.select?.name || 'General',
       icon: page.icon?.emoji || '📄',
       lastEdited: page.last_edited_time ? new Date(page.last_edited_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      content: "Content loaded via Notion API", 
+      content: "Content loaded via Notion API",
       tags: page.properties?.Tags?.multi_select?.map((t: any) => t.name) || [],
       syncStatus: 'synced',
       notionUrl: page.url
@@ -183,19 +146,16 @@ export const getNotionDocs = async (): Promise<NotionResponse> => {
 
     return { docs, source: 'api' };
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Notion Sync Failed:", error);
-    return { 
-      docs: MOCK_NOTION_PAGES, 
-      error: `Sync Failed: ${error.message}`,
+    return {
+      docs: MOCK_NOTION_PAGES,
+      error: `Sync Failed: ${(error as Error).message}`,
       source: 'mock'
     };
   }
 };
 
-/**
- * CREATE: Creates a new page in the database
- */
 export const createNotionPage = async (page: Partial<NotionPage>): Promise<{ success: boolean; id?: string; error?: string }> => {
   const dbId = localStorage.getItem('notion_db_id');
   if (!dbId) return { success: false, error: 'Missing Database ID' };
@@ -218,15 +178,12 @@ export const createNotionPage = async (page: Partial<NotionPage>): Promise<{ suc
   try {
     const data = await callNotionProxy('/pages', 'POST', payload);
     return { success: true, id: data.id };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Create Page Failed:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 };
 
-/**
- * UPDATE: Updates properties of an existing page
- */
 export const updateNotionPage = async (id: string, updates: Partial<NotionPage>): Promise<boolean> => {
   const payload = {
     properties: mapInternalToNotionProperties(updates),

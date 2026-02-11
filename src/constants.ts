@@ -1,8 +1,7 @@
-import { NotionPage, UserRole, SalesMetric, Dispensary, WorkOrder } from './types';
+import { NotionPage, UserRole, SalesMetric, Dispensary, WorkOrder, Product, ProposalCustomer, SavedProposal } from './types';
 
 export const APP_NAME = "PICC Connect";
 
-// Simulating a Notion Database response
 export const MOCK_NOTION_PAGES: NotionPage[] = [
   {
     id: '1',
@@ -49,7 +48,6 @@ export const MOCK_NOTION_PAGES: NotionPage[] = [
     content: 'Link to Google Drive for logos, fonts (Inter), and slide templates. Do not stretch the logo.',
     tags: ['Brand', 'Design'],
   },
-  // New Mock Data for Admin Analysis
   {
     id: '6',
     title: 'Weekly Sales Sync Notes - Oct 12',
@@ -118,81 +116,81 @@ export const MOCK_DISPENSARIES: Dispensary[] = [
 ];
 
 export const MOCK_WORK_ORDERS: WorkOrder[] = [
-  { 
-    id: 'wo1', 
-    ticketNumber: 'WO-1024', 
-    title: 'Setup PPP Integration', 
-    type: 'PPP Onboarding', 
-    status: 'New', 
-    dispensaryId: 'd2', 
+  {
+    id: 'wo1',
+    ticketNumber: 'WO-1024',
+    title: 'Setup PPP Integration',
+    type: 'PPP Onboarding',
+    status: 'New',
+    dispensaryId: 'd2',
     requesterName: 'Jessica Pearson',
-    priority: 'High', 
-    description: 'Need to get API key from owner. They are unresponsive to emails.', 
-    dateCreated: '2023-10-25', 
+    priority: 'High',
+    description: 'Need to get API key from owner. They are unresponsive to emails.',
+    dateCreated: '2023-10-25',
     assignee: UserRole.SALES_OPS,
     channel: 'Email',
     sentiment: 'Neutral',
     aiSummary: 'Customer is waiting on instructions. Recommend resending the API Key guide.'
   },
-  { 
-    id: 'wo2', 
-    ticketNumber: 'WO-1025', 
-    title: 'Restock Edibles Display', 
-    type: 'General Order', 
-    status: 'In Progress', 
-    dispensaryId: 'd1', 
+  {
+    id: 'wo2',
+    ticketNumber: 'WO-1025',
+    title: 'Restock Edibles Display',
+    type: 'General Order',
+    status: 'In Progress',
+    dispensaryId: 'd1',
     requesterName: 'Mike Ross',
-    priority: 'Medium', 
-    description: 'Client requested marketing materials refresh for the front counter.', 
-    dateCreated: '2023-10-26', 
+    priority: 'Medium',
+    description: 'Client requested marketing materials refresh for the front counter.',
+    dateCreated: '2023-10-26',
     assignee: UserRole.AMBASSADOR,
     channel: 'SMS',
     sentiment: 'Positive',
     aiSummary: 'Routine request. Check inventory for "Summer Edibles" kit.'
   },
-  { 
-    id: 'wo3', 
-    ticketNumber: 'WO-1021', 
-    title: 'Q4 Sales Proposal', 
-    type: 'PPP Proposal', 
-    status: 'Completed', 
-    dispensaryId: 'd3', 
+  {
+    id: 'wo3',
+    ticketNumber: 'WO-1021',
+    title: 'Q4 Sales Proposal',
+    type: 'PPP Proposal',
+    status: 'Completed',
+    dispensaryId: 'd3',
     requesterName: 'Harvey Specter',
-    priority: 'High', 
-    description: 'Sent proposal for holiday bundle including new tiers.', 
-    dateCreated: '2023-10-20', 
+    priority: 'High',
+    description: 'Sent proposal for holiday bundle including new tiers.',
+    dateCreated: '2023-10-20',
     assignee: UserRole.SALES_REP,
     channel: 'Phone',
     sentiment: 'Positive',
     aiSummary: 'Deal closed verbally. Proposal document serves as confirmation.'
   },
-  { 
-    id: 'wo4', 
-    ticketNumber: 'WO-1026', 
-    title: 'Fix API Connection', 
-    type: 'Support Case', 
-    status: 'New', 
-    dispensaryId: 'd6', 
+  {
+    id: 'wo4',
+    ticketNumber: 'WO-1026',
+    title: 'Fix API Connection',
+    type: 'Support Case',
+    status: 'New',
+    dispensaryId: 'd6',
     requesterName: 'Rachel Zane',
-    priority: 'High', 
-    description: 'API Key provided is invalid. Need to coordinate call with IT.', 
-    dateCreated: '2023-10-27', 
+    priority: 'High',
+    description: 'API Key provided is invalid. Need to coordinate call with IT.',
+    dateCreated: '2023-10-27',
     assignee: 'Unassigned',
     channel: 'Slack',
     sentiment: 'Negative',
     aiSummary: 'Customer is frustrated due to downtime. Suggest immediate escalation to Tech Support.'
   },
-  { 
-    id: 'wo5', 
-    ticketNumber: 'WO-1027', 
-    title: 'Initial Outreach', 
-    type: 'PPP Proposal', 
-    status: 'New', 
-    dispensaryId: 'd7', 
+  {
+    id: 'wo5',
+    ticketNumber: 'WO-1027',
+    title: 'Initial Outreach',
+    type: 'PPP Proposal',
+    status: 'New',
+    dispensaryId: 'd7',
     requesterName: 'Alex Williams',
-    priority: 'Low', 
-    description: 'Cold call scheduled for next Tuesday.', 
-    dateCreated: '2023-10-27', 
+    priority: 'Low',
+    description: 'Cold call scheduled for next Tuesday.',
+    dateCreated: '2023-10-27',
     assignee: 'Unassigned',
     channel: 'Phone',
     sentiment: 'Neutral',
@@ -213,4 +211,113 @@ export const MOCK_WORK_ORDERS: WorkOrder[] = [
     sentiment: 'Neutral',
     aiSummary: 'Check Timesheet ID #9982 against approved logs.'
   }
+];
+
+export const MOCK_PRODUCTS: Product[] = [
+  {
+    id: 'prod1',
+    product_code: 'PREROLL001',
+    product_title: 'Original Pre-Roll',
+    brand: 'Treetop',
+    product_type: 'Pre-Roll',
+    size: '1g',
+    size_grams: 1,
+    strain_name: 'Blue Dream',
+    strain_type: 'H',
+    available_quantity: 500,
+    unit_price: 12.50,
+    case_size: 20,
+    inventory_class: 'PRE_ROLL',
+    is_active: true,
+  },
+  {
+    id: 'prod2',
+    product_code: 'PREROLL002',
+    product_title: 'Classic Pre-Roll',
+    brand: 'Treetop',
+    product_type: 'Pre-Roll',
+    size: '0.5g',
+    size_grams: 0.5,
+    strain_name: 'Sour Diesel',
+    strain_type: 'S',
+    available_quantity: 300,
+    unit_price: 8.00,
+    case_size: 40,
+    inventory_class: 'PRE_ROLL',
+    is_active: true,
+  },
+  {
+    id: 'prod3',
+    product_code: 'ACC001',
+    product_title: 'Rolling Papers Pack',
+    brand: 'Generic',
+    product_type: 'Accessories',
+    size: 'Standard',
+    size_grams: 0,
+    strain_name: null,
+    strain_type: null,
+    available_quantity: 1000,
+    unit_price: 2.50,
+    case_size: 100,
+    inventory_class: 'ACCESSORIES',
+    is_active: true,
+  },
+  {
+    id: 'prod4',
+    product_code: 'PREROLL003',
+    product_title: 'Premium Pre-Roll',
+    brand: 'Highline',
+    product_type: 'Pre-Roll',
+    size: '1.5g',
+    size_grams: 1.5,
+    strain_name: 'Granddaddy Purple',
+    strain_type: 'I',
+    available_quantity: 150,
+    unit_price: 18.00,
+    case_size: 15,
+    inventory_class: 'PRE_ROLL',
+    is_active: true,
+  },
+];
+
+export const PROPOSAL_CUSTOMERS: ProposalCustomer[] = [
+  {
+    id: 'cust1',
+    name: 'Green Leaf Wellness',
+    dba_name: 'GLW Denver',
+    location: 'Denver, CO',
+    created_at: '2023-01-15',
+  },
+  {
+    id: 'cust2',
+    name: 'Urban Herb',
+    dba_name: 'UH Seattle',
+    location: 'Seattle, WA',
+    created_at: '2023-02-20',
+  },
+];
+
+export const SEED_PROPOSALS: SavedProposal[] = [
+  {
+    id: 'prop1',
+    title: 'January Restock',
+    customer: PROPOSAL_CUSTOMERS[0],
+    items: [
+      {
+        product_id: 'prod1',
+        product_title: 'Original Pre-Roll',
+        brand: 'Treetop',
+        strain_name: 'Blue Dream',
+        strain_type: 'H',
+        size: '1g',
+        quantity: 100,
+        unit_price: 12.50,
+        line_total: 1250.00,
+      },
+    ],
+    total_items: 100,
+    total_cost: 1250.00,
+    created_at: '2023-01-10',
+    status: 'submitted',
+  },
 ];
