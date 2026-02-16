@@ -1,130 +1,112 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserRole } from '../types';
-import { SALES_METRICS } from '../constants';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Users, Calendar, Briefcase } from 'lucide-react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { AlertCircle, Briefcase, Calendar, Database, Loader2, Users } from 'lucide-react';
+import { loadCommandCenterMetrics, type CommandCenterMetrics } from '../services/commandCenterService';
 
 interface DashboardProps {
   currentRole: UserRole;
 }
 
-const data = [
-  { name: 'Jan', uv: 4000, pv: 2400, amt: 2400 },
-  { name: 'Feb', uv: 3000, pv: 1398, amt: 2210 },
-  { name: 'Mar', uv: 2000, pv: 9800, amt: 2290 },
-  { name: 'Apr', uv: 2780, pv: 3908, amt: 2000 },
-  { name: 'May', uv: 1890, pv: 4800, amt: 2181 },
-  { name: 'Jun', uv: 2390, pv: 3800, amt: 2500 },
-  { name: 'Jul', uv: 3490, pv: 4300, amt: 2100 },
-];
+const EMPTY_METRICS: CommandCenterMetrics = {
+  customers: 0,
+  leads: 0,
+  openWorkOrders: 0,
+  pendingVendorSubmissions: 0,
+  activeInventorySkus: 0,
+  recentUpdates: [],
+  dbMap: {},
+  source: 'fallback',
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
-  const metrics = SALES_METRICS[currentRole];
+  const [metrics, setMetrics] = useState<CommandCenterMetrics>(EMPTY_METRICS);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    setLoading(true);
+    const data = await loadCommandCenterMetrics();
+    setMetrics(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const cards = [
+    { label: 'Customers', value: metrics.customers, icon: <Users size={18} />, color: 'bg-indigo-50 text-indigo-600' },
+    { label: 'Leads', value: metrics.leads, icon: <Users size={18} />, color: 'bg-blue-50 text-blue-600' },
+    { label: 'Open Work Orders', value: metrics.openWorkOrders, icon: <Briefcase size={18} />, color: 'bg-amber-50 text-amber-600' },
+    { label: 'Pending Vendor Submissions', value: metrics.pendingVendorSubmissions, icon: <Calendar size={18} />, color: 'bg-rose-50 text-rose-600' },
+    { label: 'Active Inventory SKUs', value: metrics.activeInventorySkus, icon: <Database size={18} />, color: 'bg-emerald-50 text-emerald-600' },
+  ];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {currentRole}</h1>
-          <p className="text-slate-500">Here's what's happening at PICC Platform today.</p>
+          <h1 className="text-2xl font-bold text-slate-900">PICC Command Center</h1>
+          <p className="text-slate-500">Live operations snapshot for {currentRole}.</p>
         </div>
-        <div className="text-sm text-slate-400">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        <div className="text-right">
+          <div className="text-sm text-slate-400">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+          <button onClick={refresh} className="text-sm text-indigo-600 hover:text-indigo-800 mt-1">Refresh live data</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {metrics.map((metric, idx) => (
-          <div key={idx} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-4">
-              <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">{metric.name}</span>
-              <div className={`p-2 rounded-lg ${
-                idx === 0 ? 'bg-indigo-50 text-indigo-600' :
-                idx === 1 ? 'bg-blue-50 text-blue-600' :
-                'bg-emerald-50 text-emerald-600'
-              }`}>
-                {idx === 0 ? <DollarSign size={20} /> : idx === 1 ? <Users size={20} /> : <Calendar size={20} />}
-              </div>
+      {metrics.source === 'fallback' && !loading && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertCircle size={16} />
+          Could not read live Notion data. Check auth and database mappings in Settings.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {cards.map((card) => (
+          <div key={card.label} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-3">
+              <div className="text-xs uppercase tracking-wide text-slate-500 font-semibold">{card.label}</div>
+              <div className={`p-2 rounded-lg ${card.color}`}>{card.icon}</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold text-slate-900 mb-2">
-                {metric.value.toLocaleString()}
-                {metric.name.includes('Rate') || metric.name.includes('Margin') ? '%' : ''}
-              </div>
-              <div className={`flex items-center text-sm font-medium ${
-                metric.trend === 'up' ? 'text-emerald-600' :
-                metric.trend === 'down' ? 'text-red-600' :
-                'text-slate-500'
-              }`}>
-                {metric.trend === 'up' ? <TrendingUp size={16} className="mr-1" /> :
-                  metric.trend === 'down' ? <TrendingDown size={16} className="mr-1" /> :
-                    <Minus size={16} className="mr-1" />}
-                {Math.abs(metric.change)}% vs last month
-              </div>
-            </div>
+            <div className="text-3xl font-bold text-slate-900">{loading ? '—' : card.value.toLocaleString()}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-96">
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-800 mb-6">Performance Overview</h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <defs>
-                  <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Area type="monotone" dataKey="uv" stroke="#6366f1" fillOpacity={1} fill="url(#colorUv)" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">Recent Activity (Notion)</h3>
+          {loading ? (
+            <div className="text-slate-500 text-sm flex items-center gap-2"><Loader2 className="animate-spin" size={16} /> Loading updates...</div>
+          ) : metrics.recentUpdates.length === 0 ? (
+            <div className="text-slate-500 text-sm">No updates found.</div>
+          ) : (
+            <div className="space-y-3">
+              {metrics.recentUpdates.map((item, idx) => (
+                <div key={`${item.title}-${idx}`} className="pb-3 border-b border-slate-100 last:border-b-0">
+                  <div className="font-medium text-slate-800 text-sm">{item.title}</div>
+                  <div className="text-xs text-slate-500 mt-1">{item.source} • {item.lastEdited ? new Date(item.lastEdited).toLocaleString() : 'Unknown time'}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">Quick Actions</h3>
-          <div className="space-y-3 flex-1">
-            <button className="w-full text-left p-3 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all flex items-center gap-3 group">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <DollarSign size={16} />
-              </div>
-              <div>
-                <div className="font-medium text-slate-800">Submit Expense</div>
-                <div className="text-xs text-slate-500">Finance Portal</div>
-              </div>
-            </button>
-            <button className="w-full text-left p-3 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all flex items-center gap-3 group">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                <Briefcase size={16} />
-              </div>
-              <div>
-                <div className="font-medium text-slate-800">New Deal Lead</div>
-                <div className="text-xs text-slate-500">Salesforce CRM</div>
-              </div>
-            </button>
-            <button className="w-full text-left p-3 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all flex items-center gap-3 group">
-              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                <Users size={16} />
-              </div>
-              <div>
-                <div className="font-medium text-slate-800">Refer Ambassador</div>
-                <div className="text-xs text-slate-500">HR Portal</div>
-              </div>
-            </button>
-          </div>
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <div className="text-xs font-semibold text-slate-400 uppercase mb-2">Recent Updates</div>
-            <div className="text-sm text-slate-600">
-              <p className="mb-2">🎉 <span className="font-medium text-slate-900">Sarah J.</span> closed a $50k deal!</p>
-              <p>📢 New marketing assets uploaded to Notion.</p>
-            </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">Connected Data Sources</h3>
+          <div className="space-y-2 text-sm">
+            {Object.entries(metrics.dbMap).length === 0 ? (
+              <div className="text-slate-500">No database mappings saved yet. Go to Settings → Notion.</div>
+            ) : (
+              Object.entries(metrics.dbMap).map(([key, value]) => (
+                <div key={key} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
+                  <span className="font-medium text-slate-700">{key}</span>
+                  <span className="text-xs text-slate-500 font-mono">{value}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
