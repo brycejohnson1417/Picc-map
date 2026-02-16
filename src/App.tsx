@@ -16,6 +16,14 @@ import { BAOpsView } from './components/BAOpsView';
 import { UserRole } from './types';
 import { MOCK_NOTION_PAGES } from './constants';
 
+const roleNavIds: Record<UserRole, string[]> = {
+  [UserRole.AMBASSADOR]: ['dashboard', 'ba-ops', 'sales', 'wiki'],
+  [UserRole.SALES_REP]: ['dashboard', 'sales', 'ba-ops', 'proposals', 'wiki'],
+  [UserRole.SALES_OPS]: ['dashboard', 'service-center', 'ppp', 'ba-ops', 'sales', 'team', 'wiki'],
+  [UserRole.FINANCE]: ['dashboard', 'finance', 'team', 'wiki'],
+  [UserRole.ADMIN]: ['dashboard', 'service-center', 'ppp', 'ba-ops', 'sales', 'proposals', 'finance', 'team', 'wiki', 'admin', 'settings'],
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.SALES_REP);
@@ -44,6 +52,13 @@ const App: React.FC = () => {
 
     checkSession();
   }, []);
+
+  useEffect(() => {
+    const allowed = roleNavIds[userRole];
+    if (!allowed.includes(activeTab) && activeTab !== 'customer-portal' && activeTab !== 'settings') {
+      setActiveTab('dashboard');
+    }
+  }, [userRole, activeTab]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -37,8 +37,17 @@ const navItems: NavItem[] = [
   { id: 'wiki', label: 'Notion Wiki', icon: FileText, group: 'People & Knowledge' },
 ];
 
+const roleNavIds: Record<UserRole, string[]> = {
+  [UserRole.AMBASSADOR]: ['dashboard', 'ba-ops', 'sales', 'wiki'],
+  [UserRole.SALES_REP]: ['dashboard', 'sales', 'ba-ops', 'proposals', 'wiki'],
+  [UserRole.SALES_OPS]: ['dashboard', 'service-center', 'ppp', 'ba-ops', 'sales', 'team', 'wiki'],
+  [UserRole.FINANCE]: ['dashboard', 'finance', 'team', 'wiki'],
+  [UserRole.ADMIN]: navItems.map((i) => i.id),
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setActiveTab, setRole }) => {
-  const groups = Array.from(new Set(navItems.map((item) => item.group)));
+  const visibleItems = navItems.filter((item) => roleNavIds[currentRole].includes(item.id));
+  const groups = Array.from(new Set(visibleItems.map((item) => item.group)));
 
   return (
     <div className="w-64 bg-slate-900 text-white h-screen flex flex-col fixed left-0 top-0 z-10">
@@ -55,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setAct
           <div key={group}>
             <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-2 pb-2">{group}</div>
             <div className="space-y-1">
-              {navItems.filter((item) => item.group === group).map((item) => (
+              {visibleItems.filter((item) => item.group === group).map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
@@ -71,17 +80,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeTab, setAct
           </div>
         ))}
 
-        <div className="pt-4 border-t border-slate-800">
-          <button
-            onClick={() => setActiveTab('admin')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-              activeTab === 'admin' ? 'bg-indigo-900 text-indigo-100 border border-indigo-700' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <ShieldCheck size={18} />
-            <span className="font-medium text-sm">Admin & Audit</span>
-          </button>
-        </div>
+        {currentRole === UserRole.ADMIN && (
+          <div className="pt-4 border-t border-slate-800">
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                activeTab === 'admin' ? 'bg-indigo-900 text-indigo-100 border border-indigo-700' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <ShieldCheck size={18} />
+              <span className="font-medium text-sm">Admin & Audit</span>
+            </button>
+          </div>
+        )}
       </nav>
 
       <div className="p-4 border-t border-slate-700 space-y-3">
