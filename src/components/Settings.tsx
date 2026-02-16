@@ -1,15 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Check, XCircle, RefreshCw, ShieldCheck, FileSpreadsheet } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Check, XCircle, RefreshCw, ShieldCheck, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { validateNotionToken, searchDatabases } from '../services/notionService';
+import { DB_FIELDS, getMissingMappings, getSavedDbMap, saveDbMap, type DbMappingKey } from '../services/notionDataService';
 import { NotionDatabase, NotionBot } from '../types';
-
-const DB_FIELDS = [
-  { key: 'crm', label: 'CRM Database' },
-  { key: 'workOrders', label: 'Work Orders Database' },
-  { key: 'vendorSubmissions', label: 'Vendor Submissions Database' },
-  { key: 'inventory', label: 'Inventory Database' },
-  { key: 'wiki', label: 'Wiki Database' },
-] as const;
 
 export const Settings: React.FC = () => {
   const [step, setStep] = useState<1 | 2>(1);
@@ -27,17 +20,13 @@ export const Settings: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   useEffect(() => {
-    const rawMap = localStorage.getItem('notion_db_map');
-    if (rawMap) {
-      try {
-        setDbMap(JSON.parse(rawMap));
-        setStep(2);
-      } catch {
-        setDbMap({});
-      }
+    const map = getSavedDbMap();
+    if (Object.keys(map).length > 0) {
+      setDbMap(map);
+      setStep(2);
     }
 
-    validateNotionToken().then((info) => {
+    void validateNotionToken().then((info) => {
       if (info) setBotInfo(info);
     });
 
@@ -45,14 +34,16 @@ export const Settings: React.FC = () => {
     setGoogleApiKey(localStorage.getItem('google_api_key') || '');
   }, []);
 
-  const loadDatabases = async () => {
+  const missingRequired = useMemo(() => getMissingMappings(dbMap), [dbMap]);
+
+  const loadDatabases = async (): Promise<void> => {
     setIsLoading(true);
     const dbs = await searchDatabases();
     setDatabases(dbs);
     setIsLoading(false);
   };
 
-  const handleConnectNotion = async () => {
+  const handleConnectNotion = async (): Promise<void> => {
     setError(null);
     setIsLoading(true);
 
@@ -69,10 +60,9 @@ export const Settings: React.FC = () => {
     setIsLoading(false);
   };
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     setSaveStatus('saving');
-    localStorage.setItem('notion_db_map', JSON.stringify(dbMap));
-    if (dbMap.wiki) localStorage.setItem('notion_db_id', dbMap.wiki);
+    saveDbMap(dbMap);
     localStorage.setItem('google_sheet_id', sheetId);
     localStorage.setItem('google_api_key', googleApiKey);
     setTimeout(() => {
@@ -85,7 +75,7 @@ export const Settings: React.FC = () => {
     <div className="max-w-5xl mx-auto space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-slate-800">Integration Setup</h2>
-        <p className="text-slate-500">Map each command center panel to the correct Notion database.</p>
+        <p className="text-slate-500">Map each command center module to the correct Notion database.</p>
       </div>
 
       <div className="flex space-x-4 border-b border-slate-200">
@@ -124,13 +114,23 @@ export const Settings: React.FC = () => {
                   <button onClick={loadDatabases} className="text-sm text-indigo-600 flex items-center gap-1"><RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh</button>
                 </div>
 
+                {missingRequired.length > 0 && (
+                  <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <AlertTriangle size={16} className="mt-0.5" />
+                    <div>
+                      <div className="font-medium">Required mappings missing</div>
+                      <div className="text-xs mt-1">{missingRequired.map((key) => DB_FIELDS.find((field) => field.key === key)?.label || key).join(', ')}</div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {DB_FIELDS.map((field) => (
                     <div key={field.key}>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1">{field.label}</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">{field.label} {field.required ? <span className="text-rose-500">*</span> : <span className="text-slate-400">(optional)</span>}</label>
                       <select
                         value={dbMap[field.key] || ''}
-                        onChange={(e) => setDbMap((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                        onChange={(e) => setDbMap((prev) => ({ ...prev, [field.key as DbMappingKey]: e.target.value }))}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                       >
                         <option value="">Select database...</option>
@@ -162,7 +162,7 @@ export const Settings: React.FC = () => {
               <FileSpreadsheet className="text-green-600" size={28} />
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Google Sheets Integration</h3>
-                <p className="text-sm text-slate-500">Optional external data source.</p>
+                <p className="text-sm text-slate-500">Optional fallback data source for PPP workflows.</p>
               </div>
             </div>
 

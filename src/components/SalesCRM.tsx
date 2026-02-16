@@ -7,11 +7,13 @@ export const SalesCRM: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [lastRefreshed, setLastRefreshed] = useState(new Date().toISOString());
 
   const refresh = async () => {
     setLoading(true);
     const data = await loadCRMRecords();
     setRows(data);
+    setLastRefreshed(new Date().toISOString());
     setLoading(false);
   };
 
@@ -40,7 +42,10 @@ export const SalesCRM: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900">Sales CRM</h2>
           <p className="text-slate-500 text-sm">Live data from Notion Dispensary Master List CRM.</p>
         </div>
-        <button onClick={refresh} className="text-sm text-indigo-600 hover:text-indigo-800">Refresh</button>
+        <div className="text-right text-xs text-slate-500">
+          <div>Last refreshed: {new Date(lastRefreshed).toLocaleString()}</div>
+          <button onClick={refresh} className="text-sm text-indigo-600 hover:text-indigo-800 mt-1">Refresh</button>
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">

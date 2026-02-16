@@ -10,6 +10,8 @@ import { PPPOnboarding } from './components/PPPOnboarding';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ProposalBuilder } from './components/ProposalBuilder';
 import { SalesCRM } from './components/SalesCRM';
+import { FinanceReports } from './components/FinanceReports';
+import { TeamDirectory } from './components/TeamDirectory';
 import { UserRole } from './types';
 import { MOCK_NOTION_PAGES } from './constants';
 
@@ -132,19 +134,9 @@ const App: React.FC = () => {
       case 'sales':
         return <SalesCRM />;
       case 'finance':
+        return <FinanceReports />;
       case 'team':
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-center p-8 bg-white rounded-xl border border-dashed border-slate-300">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-3xl">🚧</span>
-            </div>
-            <h2 className="text-xl font-semibold text-slate-800 mb-2">Module Under Construction</h2>
-            <p className="text-slate-500 max-w-md">
-              The <strong>{activeTab}</strong> module is currently being connected to the new API.
-              Please check the Notion Wiki for interim processes or ask the AI Assistant for help.
-            </p>
-          </div>
-        );
+        return <TeamDirectory />;
       default:
         return <Dashboard currentRole={userRole} />;
     }

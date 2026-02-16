@@ -139,3 +139,31 @@ export interface SavedProposal {
   created_at: string;
   status: 'draft' | 'submitted';
 }
+
+export interface FinanceMetric {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  status: string;
+  period: string;
+  lastEdited: string;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  region: string;
+  status: string;
+  email: string;
+  phone: string;
+  lastEdited: string;
+}
+
+export interface DataEnvelope<T> {
+  rows: T[];
+  source: 'api' | 'fallback';
+  warning?: string;
+  lastRefreshed: string;
+}
