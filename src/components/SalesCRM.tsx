@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, Copy, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, Copy, ExternalLink, Loader2, RefreshCw, Target } from 'lucide-react';
 import { loadCRMRecords, type CRMRecord } from '../services/crmService';
 
 type ViewKey = 'all' | 'needsScheduling' | 'inProgress' | 'awaitingReports' | 'done';
@@ -18,6 +18,7 @@ interface SavedFilterPreset {
   search: string;
   selectedView: ViewKey;
   repFilter: string[];
+  selectedRep: string;
   accountStatusFilter: string[];
   vendorStatusFilter: string[];
   locationFilter: string[];
@@ -28,6 +29,7 @@ interface SavedFilterPreset {
 
 const PRESETS_KEY = 'picc.salescrm.filter-presets.v1';
 const COLUMNS_KEY = 'picc.salescrm.visible-columns.v1';
+const ACTIVE_REP_KEY = 'picc.activeRep';
 
 const savedViews: Array<{ key: ViewKey; label: string }> = [
   { key: 'all', label: 'All Stores' },
@@ -59,6 +61,13 @@ const isAwaitingReports = (row: CRMRecord): boolean => includesAny(row.vendorDay
 const isInProgress = (row: CRMRecord): boolean => includesAny(row.vendorDayStatusNormalized, ['in_progress', 'scheduled', 'active', 'ongoing']);
 
 const isDone = (row: CRMRecord): boolean => includesAny(row.vendorDayStatusNormalized, ['done', 'completed', 'closed']);
+
+const daysSince = (iso?: string): number => {
+  if (!iso) return 999;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return 999;
+  return Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24));
+};
 
 const statusBadgeClass = (value: string, kind: 'account' | 'vendor'): string => {
   const v = value.toLowerCase();
@@ -141,6 +150,7 @@ export const SalesCRM: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
 
   const [repFilter, setRepFilter] = useState<string[]>([]);
+  const [selectedRep, setSelectedRep] = useState<string>(localStorage.getItem(ACTIVE_REP_KEY) || '');
   const [accountStatusFilter, setAccountStatusFilter] = useState<string[]>([]);
   const [vendorStatusFilter, setVendorStatusFilter] = useState<string[]>([]);
   const [locationFilter, setLocationFilter] = useState<string[]>([]);
@@ -186,6 +196,14 @@ export const SalesCRM: React.FC = () => {
     localStorage.setItem(COLUMNS_KEY, JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
+  useEffect(() => {
+    if (selectedRep) {
+      localStorage.setItem(ACTIVE_REP_KEY, selectedRep);
+    } else {
+      localStorage.removeItem(ACTIVE_REP_KEY);
+    }
+  }, [selectedRep]);
+
   const accountStatuses = useMemo(() => Array.from(new Set(rows.map((r) => r.accountStatus))).sort(), [rows]);
   const vendorStatuses = useMemo(() => Array.from(new Set(rows.map((r) => r.vendorDayStatus))).sort(), [rows]);
   const reps = useMemo(() => Array.from(new Set(rows.map((r) => r.rep))).sort(), [rows]);
@@ -193,8 +211,6 @@ export const SalesCRM: React.FC = () => {
     () => Array.from(new Set(rows.map((r) => (r.region !== '—' ? `${r.city} · ${r.region}` : r.city)))).sort(),
     [rows],
   );
-
-  const selectedRep = repFilter[0] ?? '';
 
   const filtered = useMemo(() => {
     const query = deferredSearch.trim().toLowerCase();
@@ -223,7 +239,7 @@ export const SalesCRM: React.FC = () => {
         (selectedView === 'awaitingReports' && isAwaitingReports(r)) ||
         (selectedView === 'done' && isDone(r));
 
-      const matchesMyStores = !myStoresOnly || (selectedRep ? r.rep === selectedRep : true);
+      const matchesMyStores = !myStoresOnly || (selectedRep ? r.rep === selectedRep : false);
       const matchesNeedsScheduling = !needsSchedulingOnly || isNeedsScheduling(r);
       const matchesAwaitingReports = !awaitingReportsOnly || isAwaitingReports(r);
 
@@ -255,6 +271,14 @@ export const SalesCRM: React.FC = () => {
 
   const selectedBulkRows = useMemo(() => filtered.filter((r) => selectedIds[r.id]), [filtered, selectedIds]);
 
+  const repSummary = useMemo(() => {
+    if (!selectedRep) return { myStores: 0, urgent: 0, awaiting: 0 };
+    const myRows = rows.filter((r) => r.rep === selectedRep);
+    const awaiting = myRows.filter((r) => isAwaitingReports(r)).length;
+    const urgent = myRows.filter((r) => isNeedsScheduling(r) || daysSince(r.lastEdited) > 14).length;
+    return { myStores: myRows.length, urgent, awaiting };
+  }, [rows, selectedRep]);
+
   const toggleFilter = (value: string, list: string[], setter: (next: string[]) => void) => {
     setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
@@ -276,6 +300,7 @@ export const SalesCRM: React.FC = () => {
       search,
       selectedView,
       repFilter,
+      selectedRep,
       accountStatusFilter,
       vendorStatusFilter,
       locationFilter,
@@ -291,6 +316,7 @@ export const SalesCRM: React.FC = () => {
     setSearch(preset.search);
     setSelectedView(preset.selectedView);
     setRepFilter(preset.repFilter);
+    setSelectedRep(preset.selectedRep || '');
     setAccountStatusFilter(preset.accountStatusFilter);
     setVendorStatusFilter(preset.vendorStatusFilter);
     setLocationFilter(preset.locationFilter);
@@ -307,12 +333,22 @@ export const SalesCRM: React.FC = () => {
     setSearch('');
     setSelectedView('all');
     setRepFilter([]);
+    setSelectedRep('');
     setAccountStatusFilter([]);
     setVendorStatusFilter([]);
     setLocationFilter([]);
     setMyStoresOnly(false);
     setNeedsSchedulingOnly(false);
     setAwaitingReportsOnly(false);
+  };
+
+  const applyFocusMe = () => {
+    if (!selectedRep) {
+      setMyStoresOnly(false);
+      return;
+    }
+    setMyStoresOnly(true);
+    setRepFilter([selectedRep]);
   };
 
   const contactSummary = useMemo(() => {
@@ -425,6 +461,27 @@ export const SalesCRM: React.FC = () => {
         </button>
       </div>
 
+      <div className="bg-white border border-slate-200 rounded-xl p-3">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-slate-500">Focused Rep</div>
+            <div className="text-sm font-semibold text-slate-800 mt-1">{selectedRep || 'Not selected'}</div>
+          </div>
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-indigo-600">My Stores</div>
+            <div className="text-sm font-semibold text-indigo-900 mt-1">{repSummary.myStores}</div>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-amber-600">Urgent</div>
+            <div className="text-sm font-semibold text-amber-900 mt-1">{repSummary.urgent}</div>
+          </div>
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-rose-600">Awaiting Reports</div>
+            <div className="text-sm font-semibold text-rose-900 mt-1">{repSummary.awaiting}</div>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-3">
         <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-3">
           {savedViews.map((view) => (
@@ -447,8 +504,27 @@ export const SalesCRM: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search dispensary, status, rep, city..."
-            className="min-w-[260px] flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            className="min-w-[240px] flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"
           />
+          <select
+            value={selectedRep}
+            onChange={(e) => setSelectedRep(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm min-w-[190px]"
+          >
+            <option value="">Focus rep...</option>
+            {reps.filter((rep) => rep !== 'Unassigned').map((rep) => (
+              <option key={rep} value={rep}>{rep}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={applyFocusMe}
+            className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm border ${
+              myStoresOnly && selectedRep ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            <Target size={14} /> {selectedRep ? `Focus: ${selectedRep}` : 'Focus me'}
+          </button>
           <MultiFilter
             label="Account Status"
             options={accountStatuses}
@@ -496,12 +572,18 @@ export const SalesCRM: React.FC = () => {
 
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => setMyStoresOnly((v) => !v)}
+            onClick={() => {
+              if (myStoresOnly) {
+                setMyStoresOnly(false);
+              } else {
+                applyFocusMe();
+              }
+            }}
             className={`px-3 py-1 rounded-full text-xs border ${
               myStoresOnly ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-600 border-slate-300'
             }`}
           >
-            My Stores
+            {selectedRep ? `My Stores • ${selectedRep}` : 'My Stores (pick rep)'}
           </button>
           <button
             onClick={() => setNeedsSchedulingOnly((v) => !v)}
@@ -527,6 +609,11 @@ export const SalesCRM: React.FC = () => {
             Clear filters
           </button>
 
+          {myStoresOnly && (
+            <div className="text-xs rounded-full px-3 py-1 border border-indigo-200 bg-indigo-50 text-indigo-700">
+              Deterministic focus ON {selectedRep ? `for ${selectedRep}` : '(select rep to activate)'}
+            </div>
+          )}
           <div className="ml-auto text-xs text-slate-500">Last refreshed: {new Date(lastRefreshed).toLocaleString()}</div>
         </div>
 
