@@ -56,7 +56,7 @@ export const createSession = (res: VercelResponse): void => {
 export const validatePassword = (candidate: string): boolean => {
   const expected = getPassword();
   if (!expected) return false;
-  return candidate === expected;
+  return candidate.trim() === expected.trim();
 };
 
 export const requireAuth = (req: VercelRequest, res: VercelResponse): boolean => {
