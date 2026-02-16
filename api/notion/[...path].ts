@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireAuth } from '../_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireAuth(req, res)) return;
+
   const { path } = req.query;
   const notionPath = Array.isArray(path) ? path.join('/') : path;
 

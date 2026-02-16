@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireAuth } from './_auth';
 
 const getNotionPath = (req: VercelRequest): string => {
   const fromQuery = req.query.path;
@@ -12,6 +13,8 @@ const getNotionPath = (req: VercelRequest): string => {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireAuth(req, res)) return;
+
   const notionPath = getNotionPath(req);
   const notionUrl = `https://api.notion.com/v1/${notionPath}`;
   const apiKey = process.env.NOTION_API_KEY;
