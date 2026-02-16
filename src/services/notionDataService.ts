@@ -162,6 +162,12 @@ export const propText = (prop: unknown): string => {
     if (typeof formula.string === 'string') return formula.string;
     if (typeof formula.number === 'number') return String(formula.number);
     if (typeof formula.boolean === 'boolean') return formula.boolean ? 'true' : 'false';
+    if (typeof formula.date === 'object' && formula.date !== null) {
+      return String(toRecord(formula.date).start ?? '');
+    }
+  }
+  if (type === 'date') {
+    return String(toRecord(p.date).start ?? '');
   }
 
   return '';
