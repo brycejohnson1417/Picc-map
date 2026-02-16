@@ -75,7 +75,10 @@ export const requireAuth = (req: VercelRequest, res: VercelResponse): boolean =>
 
   const [payloadB64, sig] = token.split('.');
   const expectedSig = sign(payloadB64, secret);
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expectedSig);
+
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
     res.status(401).json({ error: 'Unauthorized' });
     return false;
   }

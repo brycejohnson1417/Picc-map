@@ -91,8 +91,14 @@ export const queryDatabase = async (dbId?: string, pageSize = 200): Promise<Noti
   const all: NotionPageResult[] = [];
   let hasMore = true;
   let startCursor: string | undefined;
+  let pageCount = 0;
+  const MAX_PAGES = 50;
 
   while (hasMore) {
+    pageCount += 1;
+    if (pageCount > MAX_PAGES) {
+      throw new Error('Notion query aborted: pagination limit reached (50 pages).');
+    }
     const response = await fetch(`/api/notion/databases/${dbId}/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,7 +106,19 @@ export const queryDatabase = async (dbId?: string, pageSize = 200): Promise<Noti
     });
 
     if (!response.ok) {
-      throw new Error(`Notion query failed (${response.status})`);
+      const responseText = await response.text();
+      let message = `Notion query failed (${response.status})`;
+
+      if (responseText) {
+        try {
+          const parsed = JSON.parse(responseText) as { error?: string; message?: string };
+          message = parsed.message || parsed.error || message;
+        } catch {
+          message = `${message}: ${responseText.slice(0, 180)}`;
+        }
+      }
+
+      throw new Error(message);
     }
 
     const data = (await response.json()) as {

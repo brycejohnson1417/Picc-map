@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, Copy, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { loadCRMRecords, type CRMRecord } from '../services/crmService';
 
@@ -131,6 +131,7 @@ const MultiFilter: React.FC<MultiFilterProps> = ({ label, options, selected, onT
 export const SalesCRM: React.FC = () => {
   const [rows, setRows] = useState<CRMRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<CRMRecord | null>(null);
   const [selectedView, setSelectedView] = useState<ViewKey>('all');
@@ -147,14 +148,23 @@ export const SalesCRM: React.FC = () => {
   const [myStoresOnly, setMyStoresOnly] = useState(false);
   const [needsSchedulingOnly, setNeedsSchedulingOnly] = useState(false);
   const [awaitingReportsOnly, setAwaitingReportsOnly] = useState(false);
+  const deferredSearch = useDeferredValue(search);
 
   const refresh = async () => {
     setLoading(true);
-    const data = await loadCRMRecords();
-    setRows(data);
-    setSelected((prev) => (prev ? data.find((d) => d.id === prev.id) || null : data[0] || null));
-    setLastRefreshed(new Date().toISOString());
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const data = await loadCRMRecords();
+      setRows(data);
+      setSelected((prev) => (prev ? data.find((d) => d.id === prev.id) || null : data[0] || null));
+      setLastRefreshed(new Date().toISOString());
+    } catch (error) {
+      setRows([]);
+      setSelected(null);
+      setLoadError((error as Error).message || 'Unable to load CRM records');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -187,7 +197,7 @@ export const SalesCRM: React.FC = () => {
   const selectedRep = repFilter[0] ?? '';
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = deferredSearch.trim().toLowerCase();
 
     return rows.filter((r) => {
       const locationValue = r.region !== '—' ? `${r.city} · ${r.region}` : r.city;
@@ -231,7 +241,7 @@ export const SalesCRM: React.FC = () => {
     });
   }, [
     rows,
-    search,
+    deferredSearch,
     accountStatusFilter,
     vendorStatusFilter,
     repFilter,
@@ -567,6 +577,8 @@ export const SalesCRM: React.FC = () => {
             <div className="p-6 text-slate-500 text-sm flex items-center gap-2">
               <Loader2 className="animate-spin" size={16} /> Loading CRM records...
             </div>
+          ) : loadError ? (
+            <div className="p-6 text-sm text-red-700 bg-red-50 border-y border-red-100">{loadError}</div>
           ) : filtered.length === 0 ? (
             <div className="p-6 text-slate-500 text-sm">No records found with current filters.</div>
           ) : (
@@ -655,19 +667,7 @@ export const SalesCRM: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            {hasMoreRows && (
-              <div className="px-3 py-2 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-                <span className="text-xs text-slate-600">
-                  Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} matching records
-                </span>
-                <button
-                  onClick={() => setVisibleCount((prev) => prev + ROW_RENDER_STEP)}
-                  className="text-xs px-2.5 py-1.5 border border-slate-300 rounded-md bg-white hover:bg-slate-100"
-                >
-                  Load {Math.min(ROW_RENDER_STEP, filtered.length - visibleRows.length).toLocaleString()} more
-                </button>
-              </div>
-            )}
+
           )}
         </div>
 
