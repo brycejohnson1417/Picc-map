@@ -16,7 +16,7 @@ Production-ready PICC Command Center application built with React, TypeScript, V
 - **Notion Proxy**: `/api/notion/[...path].ts` - Forwards requests to Notion API
 - **Gemini AI**: `/api/gemini.ts` - AI-powered assistant
 - **Inventory**: `/api/inventory.ts` (optional) - Live inventory sync
-- **Sheets**: `/api/sheets/[sheetId]/values/[range]` (optional) - Google Sheets integration
+- **Sheets**: `/api/sheets/[sheetId]/values/[range]`, `/api/sheets/[sheetId]/batch`, `/api/sheets/[sheetId]/meta` (optional) - Google Sheets integration
 
 ## Environment Variables
 
@@ -25,6 +25,16 @@ Required for Vercel deployment:
 ```env
 NOTION_API_KEY=your_notion_integration_secret_token
 GEMINI_API_KEY=your_gemini_api_key
+APP_AUTH_PASSWORD=shared_password_for_fallback_login
+APP_AUTH_SECRET=random_long_secret_for_session_cookies
+```
+
+Optional (recommended) for Google sign-in + Sheets:
+
+```env
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_OAUTH_ALLOWED_DOMAIN=optional_company_domain.com
+GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 ```
 
 ### Getting API Keys
@@ -43,6 +53,20 @@ GEMINI_API_KEY=your_gemini_api_key
 4. Create an API key
 5. Set as `GEMINI_API_KEY` in Vercel
 
+#### Google OAuth Client (optional)
+1. In Google Cloud, enable OAuth consent screen.
+2. Create a **Web** OAuth client.
+3. Add redirect/origin for your environment.
+4. Set `GOOGLE_CLIENT_ID` in Vercel.
+5. (Optional) set `GOOGLE_OAUTH_ALLOWED_DOMAIN` to restrict logins to a company domain.
+
+#### Google Sheets Service Account (optional)
+1. In Google Cloud, create a service account with Sheets API access.
+2. Generate a JSON key.
+3. Share your target spreadsheet with the service-account email.
+4. Paste full JSON into `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` (Vercel env).
+5. Set `google_sheet_id` and `google_sheet_range` in app Settings.
+
 ## Deployment to Vercel
 
 ### One-Click Deploy (Recommended)
@@ -54,6 +78,9 @@ GEMINI_API_KEY=your_gemini_api_key
 5. In "Environment Variables", add:
    - `NOTION_API_KEY`
    - `GEMINI_API_KEY`
+   - `APP_AUTH_PASSWORD`
+   - `APP_AUTH_SECRET`
+   - Optional: `GOOGLE_CLIENT_ID`, `GOOGLE_OAUTH_ALLOWED_DOMAIN`, `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON`
 6. Click "Deploy"
 
 ### Manual Deployment
@@ -63,6 +90,12 @@ npm install -g vercel
 vercel link
 vercel env add NOTION_API_KEY
 vercel env add GEMINI_API_KEY
+vercel env add APP_AUTH_PASSWORD
+vercel env add APP_AUTH_SECRET
+# optional:
+# vercel env add GOOGLE_CLIENT_ID
+# vercel env add GOOGLE_OAUTH_ALLOWED_DOMAIN
+# vercel env add GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON
 vercel
 ```
 

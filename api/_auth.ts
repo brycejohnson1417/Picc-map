@@ -22,6 +22,8 @@ const getSecret = (): string | null => {
 const getPassword = (): string | null =>
   process.env.APP_AUTH_PASSWORD || process.env.AUTH_PASSWORD || null;
 
+export const passwordAuthConfigured = (): boolean => Boolean(getPassword());
+
 const parseCookies = (req: VercelRequest): Record<string, string> => {
   const raw = req.headers.cookie || '';
   const parts = raw.split(';').map((p) => p.trim()).filter(Boolean);
@@ -97,4 +99,4 @@ export const requireAuth = (req: VercelRequest, res: VercelResponse): boolean =>
   }
 };
 
-export const authConfigured = (): boolean => Boolean(getPassword() && getSecret());
+export const authConfigured = (): boolean => Boolean(getSecret());

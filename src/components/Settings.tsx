@@ -14,7 +14,7 @@ export const Settings: React.FC = () => {
   const [dbMap, setDbMap] = useState<Record<string, string>>({});
 
   const [sheetId, setSheetId] = useState('');
-  const [googleApiKey, setGoogleApiKey] = useState('');
+  const [sheetRange, setSheetRange] = useState('A1:H1000');
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export const Settings: React.FC = () => {
     });
 
     setSheetId(localStorage.getItem('google_sheet_id') || '');
-    setGoogleApiKey(localStorage.getItem('google_api_key') || '');
+    setSheetRange(localStorage.getItem('google_sheet_range') || 'A1:H1000');
   }, []);
 
   const missingRequired = useMemo(() => getMissingMappings(dbMap), [dbMap]);
@@ -65,7 +65,7 @@ export const Settings: React.FC = () => {
     setSaveStatus('saving');
     saveDbMap(dbMap);
     localStorage.setItem('google_sheet_id', sheetId);
-    localStorage.setItem('google_api_key', googleApiKey);
+    localStorage.setItem('google_sheet_range', sheetRange);
     setTimeout(() => {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 1500);
@@ -165,23 +165,40 @@ export const Settings: React.FC = () => {
         )}
 
         {activeTab === 'sheets' && (
-          <div className="p-8 max-w-lg space-y-6">
+          <div className="p-8 max-w-2xl space-y-6">
             <div className="flex items-start gap-4">
               <FileSpreadsheet className="text-green-600" size={28} />
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Google Sheets Integration</h3>
-                <p className="text-sm text-slate-500">Optional fallback data source for PPP workflows.</p>
+                <p className="text-sm text-slate-500">Optional fallback data source for PPP workflows and Nabis order views.</p>
               </div>
+            </div>
+
+            <div className="text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg p-3">
+              Sheets are now server-managed using a Google Service Account. Put credentials in Vercel env and only store sheet/range here.
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">Google Sheet ID</label>
-              <input value={sheetId} onChange={(e) => setSheetId(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-lg" />
+              <input
+                value={sheetId}
+                onChange={(e) => setSheetId(e.target.value)}
+                placeholder="e.g. 1AbCDefGhijkLmnopQ"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+              />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Google API Key</label>
-              <input type="password" value={googleApiKey} onChange={(e) => setGoogleApiKey(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-lg" />
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Default Range</label>
+              <input
+                value={sheetRange}
+                onChange={(e) => setSheetRange(e.target.value)}
+                placeholder="e.g. Orders!A:Z"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Use this for PPP fallback. For multi-tab loading + formulas, use the new backend batch endpoint.
+              </p>
             </div>
 
             <div className="text-right">

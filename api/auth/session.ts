@@ -7,7 +7,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!authConfigured()) {
-    return res.status(500).json({ error: 'Auth is not configured. Set APP_AUTH_PASSWORD and APP_AUTH_SECRET.' });
+    return res.status(500).json({ error: 'Auth is not configured. Set APP_AUTH_SECRET.' });
   }
 
   const ok = requireAuth(req, res);
