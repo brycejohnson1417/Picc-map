@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { requireAuth } from './_auth';
+import { requireAuth } from './_auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
