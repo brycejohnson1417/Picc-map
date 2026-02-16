@@ -1,9 +1,10 @@
 import { MOCK_DISPENSARIES, MOCK_WORK_ORDERS } from '../constants';
-import type { DataEnvelope, Dispensary, FinanceMetric, TeamMember, WorkOrder } from '../types';
+import { UserRole, type DataEnvelope, type Dispensary, type FinanceMetric, type TeamMember, type WorkOrder } from '../types';
 import { getSheetData } from './sheetsService';
 import {
   getTitle,
   isPendingStatus,
+  propText,
   queryDatabase,
   readByName,
   readNumberByName,
@@ -19,6 +20,129 @@ export interface FinanceReportData extends DataEnvelope<FinanceMetric> {
 }
 
 const nowIso = (): string => new Date().toISOString();
+const DEFAULT_DATE = (): string => new Date().toISOString().slice(0, 10);
+
+const normalizeText = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const findPropByHints = (props: Record<string, unknown>, hints: string[]): unknown => {
+  const entries = Object.entries(props);
+  if (entries.length === 0) return undefined;
+
+  const normalizedHints = hints.map((hint) => normalizeText(hint)).filter(Boolean);
+
+  for (const hint of normalizedHints) {
+    const exact = entries.find(([name]) => normalizeText(name) === hint);
+    if (exact) return exact[1];
+  }
+
+  for (const hint of normalizedHints) {
+    const partial = entries.find(([name]) => {
+      const normalizedName = normalizeText(name);
+      return normalizedName.includes(hint) || hint.includes(normalizedName);
+    });
+    if (partial) return partial[1];
+  }
+
+  return undefined;
+};
+
+const readTextByHints = (props: Record<string, unknown>, hints: string[]): string => {
+  const hit = findPropByHints(props, hints);
+  if (hit === undefined) return '';
+  return propText(hit).trim();
+};
+
+const toIsoDate = (raw: string): string => {
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+};
+
+const readDateByHints = (props: Record<string, unknown>, hints: string[]): string => {
+  const raw = readTextByHints(props, hints);
+  if (!raw) return '';
+  return toIsoDate(raw);
+};
+
+const readBoolByHints = (props: Record<string, unknown>, hints: string[], fallback = false): boolean => {
+  const raw = readTextByHints(props, hints);
+  if (!raw) return fallback;
+
+  const normalized = normalizeText(raw);
+  if (!normalized) return fallback;
+
+  if (['true', 'yes', 'y', '1', 'required', 'require', 'needs sign off', 'needs signoff', 'awaiting sign off', 'awaiting signoff'].includes(normalized)) {
+    return true;
+  }
+  if (['false', 'no', 'n', '0', 'none', 'not required', 'n a', 'na'].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+};
+
+const toStatus = (value: string): WorkOrder['status'] => {
+  const normalized = normalizeText(value);
+  if (!normalized) return 'New';
+  if (['archived', 'archive'].some((k) => normalized.includes(k))) return 'Archived';
+  if (['completed', 'complete', 'closed', 'resolved', 'signed off'].some((k) => normalized.includes(k))) return 'Completed';
+  if (['in progress', 'working', 'active', 'follow up', 'awaiting sign off', 'pending sign off'].some((k) => normalized.includes(k))) {
+    return 'In Progress';
+  }
+  return 'New';
+};
+
+const toType = (value: string): WorkOrder['type'] => {
+  const normalized = normalizeText(value);
+  if (!normalized) return 'Support Case';
+  if (normalized.includes('onboarding')) return 'PPP Onboarding';
+  if (normalized.includes('proposal')) return 'PPP Proposal';
+  if (normalized.includes('hr')) return 'HR Request';
+  if (normalized.includes('order')) return 'General Order';
+  return 'Support Case';
+};
+
+const toPriority = (value: string): WorkOrder['priority'] => {
+  const normalized = normalizeText(value);
+  if (normalized.includes('high') || normalized.includes('urgent') || normalized.includes('critical')) return 'High';
+  if (normalized.includes('low')) return 'Low';
+  return 'Medium';
+};
+
+const toChannel = (value: string): WorkOrder['channel'] => {
+  const normalized = normalizeText(value);
+  if (normalized.includes('email')) return 'Email';
+  if (normalized.includes('slack')) return 'Slack';
+  if (normalized.includes('phone') || normalized.includes('call')) return 'Phone';
+  if (normalized.includes('sms') || normalized.includes('text')) return 'SMS';
+  if (normalized.includes('instagram') || normalized.includes('ig')) return 'Instagram';
+  return 'Portal';
+};
+
+const toSentiment = (value: string): WorkOrder['sentiment'] => {
+  const normalized = normalizeText(value);
+  if (normalized.includes('negative') || normalized.includes('angry') || normalized.includes('frustrated')) return 'Negative';
+  if (normalized.includes('positive') || normalized.includes('happy')) return 'Positive';
+  return 'Neutral';
+};
+
+const toAssigneeRole = (value: string): WorkOrder['assignee'] => {
+  const normalized = normalizeText(value);
+  if (!normalized) return undefined;
+  if (normalized.includes('sales ops')) return UserRole.SALES_OPS;
+  if (normalized.includes('sales rep')) return UserRole.SALES_REP;
+  if (normalized.includes('brand ambassador') || normalized === 'ambassador' || normalized === 'ba') return UserRole.AMBASSADOR;
+  if (normalized.includes('finance')) return UserRole.FINANCE;
+  if (normalized.includes('platform admin') || normalized === 'admin') return UserRole.ADMIN;
+  if (normalized.includes('unassigned')) return 'Unassigned';
+  return undefined;
+};
 
 export const loadFinanceReportData = async (): Promise<FinanceReportData> => {
   const fallback: FinanceReportData = {
@@ -131,22 +255,51 @@ export const loadServiceCenterData = async (): Promise<DataEnvelope<WorkOrder>> 
     const results = await queryDatabase(dbMap.workOrders);
     const rows = results.map((page, idx) => {
       const props = page.properties ?? {};
-      const status = readByName(props, ['status']) || 'New';
-      const priority = readByName(props, ['priority']) || 'Medium';
+      const statusRaw = readTextByHints(props, ['status', 'workflow status', 'state', 'ticket status']);
+      const priorityRaw = readTextByHints(props, ['priority', 'urgency', 'severity']);
+      const assigneeName = readTextByHints(props, ['assignee', 'assigned to', 'owner', 'agent', 'rep']);
+      const followUpReason = readTextByHints(props, ['follow up reason', 'follow-up reason', 'follow up', 'next action', 'blocker']) || undefined;
+      const dueDate = readDateByHints(props, ['due date', 'follow up due', 'follow-up due', 'deadline', 'target date', 'eta']) || undefined;
+      const signOffBy = readTextByHints(props, ['sign off by', 'signed off by', 'approver', 'approved by']) || undefined;
+      const awaitingSignOffByStatus = normalizeText(statusRaw).includes('awaiting sign off') || normalizeText(statusRaw).includes('pending sign off');
+      const requiresSignOff = readBoolByHints(
+        props,
+        ['requires sign off', 'requires signoff', 'needs sign off', 'needs signoff', 'sign off required', 'signoff required'],
+        false,
+      );
+      const signedOff = readBoolByHints(props, ['signed off', 'sign off complete', 'signoff complete', 'approval complete'], false);
+      const inferredSignedOff = signedOff || normalizeText(statusRaw).includes('signed off');
+      const sentimentRaw = readTextByHints(props, ['sentiment', 'tone', 'customer sentiment']);
+      const requesterName = readTextByHints(props, ['requester', 'requestor', 'submitted by', 'contact', 'customer']) || 'Unknown';
+      const createdDate =
+        readDateByHints(props, ['date created', 'created', 'opened', 'request date', 'submitted']) ||
+        toIsoDate(page.last_edited_time || '') ||
+        DEFAULT_DATE();
+      const notionUrl = readTextByHints(props, ['notion url', 'record url', 'page url', 'ticket url']) || page.url || undefined;
 
       return {
         id: page.id,
-        ticketNumber: readByName(props, ['ticket', 'number']) || `WO-${idx + 1000}`,
+        ticketNumber: readTextByHints(props, ['ticket number', 'ticket', 'work order', 'wo number', 'case number']) || `WO-${idx + 1000}`,
         title: getTitle(props),
-        type: (readByName(props, ['type']) || 'Support Case') as WorkOrder['type'],
-        status: (status || 'New') as WorkOrder['status'],
-        requesterName: readByName(props, ['requester', 'contact', 'customer']) || 'Unknown',
-        priority: (priority === 'High' || priority === 'Low' ? priority : 'Medium') as WorkOrder['priority'],
-        description: readByName(props, ['description', 'details', 'summary']) || 'No description provided.',
-        dateCreated: readByName(props, ['created', 'date']) || new Date().toISOString().slice(0, 10),
-        channel: (readByName(props, ['channel']) || 'Portal') as WorkOrder['channel'],
-        sentiment: 'Neutral' as WorkOrder['sentiment'],
-        assignee: undefined,
+        type: toType(readTextByHints(props, ['type', 'work order type', 'category'])),
+        status: toStatus(statusRaw),
+        assignee: toAssigneeRole(assigneeName),
+        assigneeName: assigneeName || undefined,
+        dispensaryId: readTextByHints(props, ['dispensary id', 'store id', 'account id']) || undefined,
+        dispensaryName: readTextByHints(props, ['dispensary', 'store name', 'account', 'customer name']) || undefined,
+        requesterName,
+        priority: toPriority(priorityRaw),
+        description: readTextByHints(props, ['description', 'details', 'summary', 'issue']) || 'No description provided.',
+        dateCreated: createdDate,
+        dueDate,
+        followUpReason,
+        requiresSignOff: requiresSignOff || awaitingSignOffByStatus || Boolean(signOffBy),
+        signedOff: inferredSignedOff,
+        signOffBy,
+        notionUrl,
+        channel: toChannel(readTextByHints(props, ['channel', 'source', 'intake channel'])),
+        sentiment: toSentiment(sentimentRaw),
+        aiSummary: readTextByHints(props, ['ai summary', 'summary', 'internal summary']) || undefined,
       };
     });
 

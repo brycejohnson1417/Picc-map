@@ -27,6 +27,12 @@ interface SavedFilterPreset {
   awaitingReportsOnly: boolean;
 }
 
+interface ReferralSampleQueueItem {
+  row: CRMRecord;
+  tags: Array<'Referral' | 'Sample'>;
+  stage: 'Pending' | 'Active' | 'Closed';
+}
+
 const PRESETS_KEY = 'picc.salescrm.filter-presets.v1';
 const COLUMNS_KEY = 'picc.salescrm.visible-columns.v1';
 const ACTIVE_REP_KEY = 'picc.activeRep';
@@ -67,6 +73,16 @@ const daysSince = (iso?: string): number => {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return 999;
   return Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24));
+};
+
+const REFERRAL_KEYWORDS = ['referral', 'referred', 'pending referral', 'referral pending'];
+const SAMPLE_KEYWORDS = ['sample', 'trial box', 'trial', 'sample box', 'demo box', 'starter kit'];
+const PENDING_KEYWORDS = ['pending', 'awaiting', 'needs', 'to send', 'requested', 'request'];
+const CLOSED_KEYWORDS = ['closed', 'complete', 'completed', 'delivered', 'sent', 'received'];
+
+const rowSearchCorpus = (row: CRMRecord): string => {
+  const propertyText = row.properties.map((prop) => `${prop.name} ${prop.value}`).join(' ');
+  return `${row.name} ${row.accountStatus} ${row.vendorDayStatus} ${propertyText}`.toLowerCase();
 };
 
 const statusBadgeClass = (value: string, kind: 'account' | 'vendor'): string => {
@@ -279,6 +295,46 @@ export const SalesCRM: React.FC = () => {
     return { myStores: myRows.length, urgent, awaiting };
   }, [rows, selectedRep]);
 
+  const referralSamplePipeline = useMemo(() => {
+    const scopedRows = myStoresOnly && selectedRep ? rows.filter((row) => row.rep === selectedRep) : rows;
+
+    const queue: ReferralSampleQueueItem[] = scopedRows
+      .map((row) => {
+        const corpus = rowSearchCorpus(row);
+        const hasReferral = REFERRAL_KEYWORDS.some((keyword) => corpus.includes(keyword));
+        const hasSample = SAMPLE_KEYWORDS.some((keyword) => corpus.includes(keyword));
+        if (!hasReferral && !hasSample) return null;
+
+        const hasPending = PENDING_KEYWORDS.some((keyword) => corpus.includes(keyword));
+        const hasClosed = CLOSED_KEYWORDS.some((keyword) => corpus.includes(keyword));
+
+        let stage: ReferralSampleQueueItem['stage'] = 'Active';
+        if (hasClosed || isDone(row)) stage = 'Closed';
+        if (hasPending || isNeedsScheduling(row) || isAwaitingReports(row)) stage = 'Pending';
+
+        return {
+          row,
+          tags: [hasReferral ? 'Referral' : null, hasSample ? 'Sample' : null].filter(Boolean) as Array<'Referral' | 'Sample'>,
+          stage,
+        };
+      })
+      .filter((item): item is ReferralSampleQueueItem => Boolean(item))
+      .sort((a, b) => {
+        const stageWeight = { Pending: 0, Active: 1, Closed: 2 };
+        const stageDiff = stageWeight[a.stage] - stageWeight[b.stage];
+        if (stageDiff !== 0) return stageDiff;
+        return daysSince(b.row.lastEdited) - daysSince(a.row.lastEdited);
+      });
+
+    return {
+      queue,
+      referralCount: queue.filter((item) => item.tags.includes('Referral')).length,
+      sampleCount: queue.filter((item) => item.tags.includes('Sample')).length,
+      pendingCount: queue.filter((item) => item.stage === 'Pending').length,
+      openQueue: queue.filter((item) => item.stage !== 'Closed').slice(0, 8),
+    };
+  }, [rows, myStoresOnly, selectedRep]);
+
   const toggleFilter = (value: string, list: string[], setter: (next: string[]) => void) => {
     setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
@@ -479,6 +535,75 @@ export const SalesCRM: React.FC = () => {
             <div className="text-[11px] uppercase tracking-wide text-rose-600">Awaiting Reports</div>
             <div className="text-sm font-semibold text-rose-900 mt-1">{repSummary.awaiting}</div>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Referral / Sample Pipeline</h3>
+            <p className="text-xs text-slate-500">Derived from CRM keywords: referral, sample, trial box, and pending referral states.</p>
+          </div>
+          <div className="text-[11px] text-slate-500">
+            Scope: {myStoresOnly && selectedRep ? `My Stores (${selectedRep})` : 'All CRM records'}
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-indigo-600">Referral Tagged</div>
+            <div className="text-sm font-semibold text-indigo-900 mt-1">{referralSamplePipeline.referralCount}</div>
+          </div>
+          <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-cyan-700">Sample Tagged</div>
+            <div className="text-sm font-semibold text-cyan-900 mt-1">{referralSamplePipeline.sampleCount}</div>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-amber-700">Pending Queue</div>
+            <div className="text-sm font-semibold text-amber-900 mt-1">{referralSamplePipeline.pendingCount}</div>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {referralSamplePipeline.openQueue.length === 0 ? (
+            <div className="text-sm text-slate-500">No referral/sample pipeline rows found from current CRM properties.</div>
+          ) : (
+            referralSamplePipeline.openQueue.map((item) => (
+              <button
+                key={item.row.id}
+                type="button"
+                onClick={() => setSelected(item.row)}
+                className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-slate-800">{item.row.name}</div>
+                  <div className="inline-flex items-center gap-1">
+                    {item.tags.map((tag) => (
+                      <span
+                        key={`${item.row.id}-${tag}`}
+                        className={`text-[11px] rounded-full px-2 py-0.5 border ${
+                          tag === 'Referral' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                        }`}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    <span className={`text-[11px] rounded-full px-2 py-0.5 border ${
+                      item.stage === 'Pending'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                    }`}>
+                      {item.stage}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {item.row.rep} • {item.row.city}
+                  {item.row.lastEdited ? ` • updated ${new Date(item.row.lastEdited).toLocaleDateString()}` : ''}
+                </div>
+              </button>
+            ))
+          )}
         </div>
       </div>
 

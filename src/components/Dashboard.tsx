@@ -41,12 +41,21 @@ const isSchedulingStatus = (status: string): boolean => ['not_started', 'asap', 
 const isAwaitingStatus = (status: string): boolean => ['awaiting_reports', 'report_pending', 'submitted'].some((k) => status.includes(k));
 const isInProgressStatus = (status: string): boolean => ['in_progress', 'scheduled', 'active', 'ongoing'].some((k) => status.includes(k));
 const isPendingStatus = (status: string): boolean => status.toLowerCase().includes('pending');
+const REFERRAL_KEYWORDS = ['referral', 'referred', 'pending referral'];
+const SAMPLE_KEYWORDS = ['sample', 'trial box', 'trial', 'sample box', 'demo box'];
+const PIPELINE_PENDING_KEYWORDS = ['pending', 'awaiting', 'requested', 'to send', 'needs'];
+const PIPELINE_CLOSED_KEYWORDS = ['complete', 'completed', 'closed', 'sent', 'delivered', 'received'];
 
 const daysSince = (iso?: string): number => {
   if (!iso) return 999;
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return 999;
   return Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24));
+};
+
+const crmRowCorpus = (row: CRMRecord): string => {
+  const allProps = row.properties.map((prop) => `${prop.name} ${prop.value}`).join(' ');
+  return `${row.name} ${row.accountStatus} ${row.vendorDayStatus} ${allProps}`.toLowerCase();
 };
 
 const MetricCard: React.FC<{ label: string; value: string | number; tone?: 'default' | 'good' | 'warn' | 'danger' }> = ({ label, value, tone = 'default' }) => {
@@ -133,6 +142,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
   }, [crmRows]);
 
   const myRows = useMemo(() => (activeRep ? crmRows.filter((r) => r.rep === activeRep) : []), [crmRows, activeRep]);
+
+  const referralSample = useMemo(() => {
+    const scopedRows = currentRole === UserRole.SALES_REP && activeRep ? crmRows.filter((row) => row.rep === activeRep) : crmRows;
+
+    const queue = scopedRows
+      .map((row) => {
+        const corpus = crmRowCorpus(row);
+        const hasReferral = REFERRAL_KEYWORDS.some((keyword) => corpus.includes(keyword));
+        const hasSample = SAMPLE_KEYWORDS.some((keyword) => corpus.includes(keyword));
+        if (!hasReferral && !hasSample) return null;
+
+        const hasPending = PIPELINE_PENDING_KEYWORDS.some((keyword) => corpus.includes(keyword));
+        const hasClosed = PIPELINE_CLOSED_KEYWORDS.some((keyword) => corpus.includes(keyword)) || row.vendorDayStatusNormalized.includes('done');
+
+        let stage: 'Pending' | 'Active' | 'Closed' = 'Active';
+        if (hasClosed) stage = 'Closed';
+        if (hasPending || row.vendorDayStatusNormalized.includes('awaiting') || row.vendorDayStatusNormalized.includes('not_started')) stage = 'Pending';
+
+        return {
+          title: row.name,
+          stage,
+          tags: [hasReferral ? 'Referral' : null, hasSample ? 'Sample' : null].filter(Boolean).join(' + '),
+          meta: `${row.rep} • ${row.city}`,
+          staleDays: daysSince(row.lastEdited),
+        };
+      })
+      .filter((item): item is { title: string; stage: 'Pending' | 'Active' | 'Closed'; tags: string; meta: string; staleDays: number } => Boolean(item))
+      .sort((a, b) => {
+        const rank = { Pending: 0, Active: 1, Closed: 2 };
+        const stageDiff = rank[a.stage] - rank[b.stage];
+        if (stageDiff !== 0) return stageDiff;
+        return b.staleDays - a.staleDays;
+      });
+
+    return {
+      referralCount: queue.filter((item) => item.tags.includes('Referral')).length,
+      sampleCount: queue.filter((item) => item.tags.includes('Sample')).length,
+      pendingCount: queue.filter((item) => item.stage === 'Pending').length,
+      queue: queue.filter((item) => item.stage !== 'Closed').slice(0, 6),
+    };
+  }, [crmRows, currentRole, activeRep]);
 
   const warningMessages = [metrics.source === 'fallback' ? 'Command center metrics are in fallback mode.' : '', baOps.warning || '', finance.warning || '']
     .filter(Boolean)
@@ -370,7 +420,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentRole }) => {
           CRM data did not load. Go to Settings and confirm PICC CRM mapping + auth session, then refresh.
         </div>
       ) : (
-        renderRoleView()
+        <>
+          {renderRoleView()}
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-semibold text-slate-900">Referral / Sample Pipeline</h3>
+                <p className="text-xs text-slate-500 mt-1">Cross-role queue derived from CRM keyword signals.</p>
+              </div>
+              <div className="text-xs text-slate-500">
+                {currentRole === UserRole.SALES_REP && activeRep ? `Scoped to ${activeRep}` : 'Global CRM scope'}
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3"><div className="text-xs text-indigo-700">Referral Tagged</div><div className="text-xl font-semibold text-indigo-900">{referralSample.referralCount}</div></div>
+              <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3"><div className="text-xs text-cyan-700">Sample Tagged</div><div className="text-xl font-semibold text-cyan-900">{referralSample.sampleCount}</div></div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><div className="text-xs text-amber-700">Pending Queue</div><div className="text-xl font-semibold text-amber-900">{referralSample.pendingCount}</div></div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {referralSample.queue.length === 0 ? (
+                <div className="text-sm text-slate-500">No active referral/sample rows detected in CRM properties.</div>
+              ) : (
+                referralSample.queue.map((item) => (
+                  <div key={`${item.title}-${item.meta}`} className="rounded-lg border border-slate-100 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-medium text-slate-800">{item.title}</div>
+                      <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 ${
+                        item.stage === 'Pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {item.tags} • {item.stage}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">{item.meta}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       <div className="text-xs text-slate-500 inline-flex items-center gap-1">
