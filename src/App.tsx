@@ -9,6 +9,7 @@ import { CustomerPortal } from './components/CustomerPortal';
 import { PPPOnboarding } from './components/PPPOnboarding';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ProposalBuilder } from './components/ProposalBuilder';
+import { SalesCRM } from './components/SalesCRM';
 import { UserRole } from './types';
 import { MOCK_NOTION_PAGES } from './constants';
 
@@ -129,6 +130,7 @@ const App: React.FC = () => {
       case 'proposals':
         return <ProposalBuilder />;
       case 'sales':
+        return <SalesCRM />;
       case 'finance':
       case 'team':
         return (
