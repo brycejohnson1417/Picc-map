@@ -3,6 +3,7 @@ import { Check, XCircle, RefreshCw, ShieldCheck, FileSpreadsheet, AlertTriangle 
 import { validateNotionToken, searchDatabases } from '../services/notionService';
 import { DB_FIELDS, getMissingMappings, getSavedDbMap, saveDbMap, type DbMappingKey } from '../services/notionDataService';
 import { NotionDatabase, NotionBot } from '../types';
+import { PICC_LOCKED_MODE } from '../config/piccDefaults';
 
 export const Settings: React.FC = () => {
   const [step, setStep] = useState<1 | 2>(1);
@@ -124,6 +125,12 @@ export const Settings: React.FC = () => {
                   </div>
                 )}
 
+                {PICC_LOCKED_MODE && (
+                  <div className="text-sm text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                    PICC mode is locked: database mappings are pinned to defaults so they stay consistent.
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {DB_FIELDS.map((field) => (
                     <div key={field.key}>
@@ -131,7 +138,8 @@ export const Settings: React.FC = () => {
                       <select
                         value={dbMap[field.key] || ''}
                         onChange={(e) => setDbMap((prev) => ({ ...prev, [field.key as DbMappingKey]: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                        disabled={PICC_LOCKED_MODE}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500"
                       >
                         <option value="">Select database...</option>
                         {databases.map((db) => (
@@ -147,8 +155,8 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="flex justify-end">
-                  <button onClick={handleSave} className="px-8 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
-                    {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save Mapping'}
+                  <button onClick={handleSave} disabled={PICC_LOCKED_MODE} className="px-8 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed">
+                    {PICC_LOCKED_MODE ? 'Locked for PICC' : saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save Mapping'}
                   </button>
                 </div>
               </div>

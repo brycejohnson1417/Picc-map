@@ -1,4 +1,5 @@
 import { searchDatabases } from './notionService';
+import { PICC_DEFAULT_DB_MAP, PICC_LOCKED_MODE } from '../config/piccDefaults';
 
 export type DbMappingKey =
   | 'crm'
@@ -38,17 +39,26 @@ export interface NotionPageResult {
 
 export const getSavedDbMap = (): Record<string, string> => {
   const raw = localStorage.getItem('notion_db_map');
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw) as Record<string, string>;
-  } catch {
-    return {};
+  let stored: Record<string, string> = {};
+  if (raw) {
+    try {
+      stored = JSON.parse(raw) as Record<string, string>;
+    } catch {
+      stored = {};
+    }
   }
+
+  if (PICC_LOCKED_MODE) {
+    return { ...stored, ...PICC_DEFAULT_DB_MAP } as Record<string, string>;
+  }
+
+  return { ...PICC_DEFAULT_DB_MAP, ...stored } as Record<string, string>;
 };
 
 export const saveDbMap = (dbMap: Record<string, string>): void => {
-  localStorage.setItem('notion_db_map', JSON.stringify(dbMap));
-  if (dbMap.wiki) localStorage.setItem('notion_db_id', dbMap.wiki);
+  const finalMap = PICC_LOCKED_MODE ? ({ ...dbMap, ...PICC_DEFAULT_DB_MAP } as Record<string, string>) : dbMap;
+  localStorage.setItem('notion_db_map', JSON.stringify(finalMap));
+  if (finalMap.wiki) localStorage.setItem('notion_db_id', finalMap.wiki);
 };
 
 export const getMissingMappings = (dbMap: Record<string, string>): DbMappingKey[] => {
@@ -58,7 +68,10 @@ export const getMissingMappings = (dbMap: Record<string, string>): DbMappingKey[
 export const resolveDbMap = async (): Promise<Record<string, string>> => {
   const map = getSavedDbMap();
   const missing = DB_FIELDS.map((field) => field.key).filter((key) => !map[key]);
-  if (missing.length === 0) return map;
+  if (missing.length === 0) {
+    saveDbMap(map);
+    return map;
+  }
 
   const dbs = await searchDatabases();
   missing.forEach((key) => {
@@ -69,7 +82,7 @@ export const resolveDbMap = async (): Promise<Record<string, string>> => {
   });
 
   saveDbMap(map);
-  return map;
+  return getSavedDbMap();
 };
 
 export const queryDatabase = async (dbId?: string, pageSize = 200): Promise<NotionPageResult[]> => {
