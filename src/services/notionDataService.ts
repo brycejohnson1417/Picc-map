@@ -75,18 +75,33 @@ export const resolveDbMap = async (): Promise<Record<string, string>> => {
 export const queryDatabase = async (dbId?: string, pageSize = 200): Promise<NotionPageResult[]> => {
   if (!dbId) return [];
 
-  const response = await fetch(`/api/notion/databases/${dbId}/query`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ page_size: pageSize }),
-  });
+  const all: NotionPageResult[] = [];
+  let hasMore = true;
+  let startCursor: string | undefined;
 
-  if (!response.ok) {
-    throw new Error(`Notion query failed (${response.status})`);
+  while (hasMore) {
+    const response = await fetch(`/api/notion/databases/${dbId}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page_size: pageSize, start_cursor: startCursor }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Notion query failed (${response.status})`);
+    }
+
+    const data = (await response.json()) as {
+      results?: NotionPageResult[];
+      has_more?: boolean;
+      next_cursor?: string | null;
+    };
+
+    all.push(...(data.results ?? []));
+    hasMore = Boolean(data.has_more && data.next_cursor);
+    startCursor = data.next_cursor ?? undefined;
   }
 
-  const data = (await response.json()) as { results?: NotionPageResult[] };
-  return data.results ?? [];
+  return all;
 };
 
 const toRecord = (value: unknown): Record<string, unknown> => {
