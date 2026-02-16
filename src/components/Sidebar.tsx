@@ -11,6 +11,7 @@ import {
   Globe,
   ShieldCheck,
   ClipboardList,
+  CalendarCheck2,
   type LucideIcon,
 } from 'lucide-react';
 import { UserRole } from '../types';
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Mission Dashboard', icon: LayoutDashboard, group: 'Command Center' },
   { id: 'service-center', label: 'Service Center', icon: HeadphonesIcon, group: 'Operations' },
   { id: 'ppp', label: 'PPP Pipeline', icon: KanbanSquare, group: 'Operations' },
+  { id: 'ba-ops', label: 'BA Ops', icon: CalendarCheck2, group: 'Operations' },
   { id: 'sales', label: 'Sales CRM', icon: Briefcase, group: 'Revenue' },
   { id: 'proposals', label: 'Proposal Builder', icon: ClipboardList, group: 'Revenue' },
   { id: 'finance', label: 'Finance Reports', icon: PieChart, group: 'Revenue' },

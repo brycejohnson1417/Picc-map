@@ -12,6 +12,7 @@ import { ProposalBuilder } from './components/ProposalBuilder';
 import { SalesCRM } from './components/SalesCRM';
 import { FinanceReports } from './components/FinanceReports';
 import { TeamDirectory } from './components/TeamDirectory';
+import { BAOpsView } from './components/BAOpsView';
 import { UserRole } from './types';
 import { MOCK_NOTION_PAGES } from './constants';
 
@@ -22,14 +23,20 @@ const App: React.FC = () => {
   const [isAuthed, setIsAuthed] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
       try {
         const res = await fetch('/api/auth/session');
+        if (!res.ok && res.status >= 500) {
+          const data = await res.json().catch(() => ({ error: 'Auth service unavailable. Verify APP_AUTH_PASSWORD and APP_AUTH_SECRET.' }));
+          setAuthError(data.error || 'Auth service unavailable. Verify APP_AUTH_PASSWORD and APP_AUTH_SECRET.');
+        }
         setIsAuthed(res.ok);
       } catch {
         setIsAuthed(false);
+        setAuthError('Unable to reach auth service. Check network or deployment status.');
       } finally {
         setAuthLoading(false);
       }
@@ -40,7 +47,9 @@ const App: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSigningIn) return;
     setAuthError('');
+    setIsSigningIn(true);
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -59,12 +68,17 @@ const App: React.FC = () => {
       setPassword('');
     } catch {
       setAuthError('Network error while logging in');
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    setIsAuthed(false);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      setIsAuthed(false);
+    }
   };
 
   if (authLoading) {
@@ -91,8 +105,12 @@ const App: React.FC = () => {
             required
           />
           {authError && <div className="text-sm text-red-600">{authError}</div>}
-          <button type="submit" className="w-full bg-slate-900 text-white rounded-lg py-2 hover:bg-slate-800">
-            Sign In
+          <button
+            type="submit"
+            disabled={isSigningIn}
+            className="w-full bg-slate-900 text-white rounded-lg py-2 hover:bg-slate-800 disabled:bg-slate-500 disabled:cursor-not-allowed"
+          >
+            {isSigningIn ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
       </div>
@@ -137,6 +155,8 @@ const App: React.FC = () => {
         return <FinanceReports />;
       case 'team':
         return <TeamDirectory />;
+      case 'ba-ops':
+        return <BAOpsView />;
       default:
         return <Dashboard currentRole={userRole} />;
     }
