@@ -14,7 +14,6 @@ import { FinanceReports } from './components/FinanceReports';
 import { TeamDirectory } from './components/TeamDirectory';
 import { BAOpsView } from './components/BAOpsView';
 import { UserRole } from './types';
-import { MOCK_NOTION_PAGES } from './constants';
 
 type GoogleCredentialResponse = {
   credential?: string;
@@ -305,7 +304,7 @@ const App: React.FC = () => {
       case 'ppp':
         return <PPPOnboarding />;
       case 'wiki':
-        return <NotionDocList docs={MOCK_NOTION_PAGES} />;
+        return <NotionDocList />;
       case 'settings':
         return <Settings />;
       case 'admin':

@@ -1,5 +1,7 @@
-import { NotionPage, NotionDatabase, NotionBot } from '../types';
 import { MOCK_NOTION_PAGES } from '../constants';
+import { NotionPage, NotionDatabase, NotionBot, SyncStatus } from '../types';
+import { IntegrationModuleKey } from '../integrations/types';
+import { integrationService } from './integrationService';
 
 export interface NotionResponse {
   docs: NotionPage[];
@@ -7,194 +9,170 @@ export interface NotionResponse {
   source: 'api' | 'mock';
 }
 
-const callNotionProxy = async (endpoint: string, method: string, body?: any) => {
-  const options: RequestInit = {
-    method: method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  };
-
-  if (body && method !== 'GET' && method !== 'HEAD') {
-    options.body = JSON.stringify(body);
+const safeCryptoId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
   }
-
-  try {
-    const response = await fetch(`/api/notion${endpoint}`, options);
-
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.indexOf("application/json") === -1) {
-      throw new Error("Received non-JSON response. Ensure your Vercel deployment has NOTION_API_KEY set.");
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      try {
-        const jsonErr = JSON.parse(errorText);
-        throw new Error(`Notion API Error: ${jsonErr.message || jsonErr.error || response.statusText}`);
-      } catch (e) {
-        throw new Error(`Proxy Error: ${response.status} ${errorText}`);
-      }
-    }
-
-    return await response.json();
-  } catch (err) {
-    throw err;
-  }
-};
-
-const mapInternalToNotionProperties = (page: Partial<NotionPage>) => {
-  const properties: any = {};
-
-  if (page.title) {
-    properties['Name'] = {
-      title: [{ text: { content: page.title } }]
-    };
-  }
-
-  if (page.category) {
-    properties['Category'] = {
-      select: { name: page.category }
-    };
-  }
-
-  if (page.tags) {
-    properties['Tags'] = {
-      multi_select: page.tags.map(tag => ({ name: tag }))
-    };
-  }
-
-  return properties;
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
 export const validateNotionToken = async (): Promise<NotionBot | null> => {
   try {
-    const data = await callNotionProxy('/users/me', 'GET');
+    const config = await integrationService.getConfig();
+    const source = config.sources.find((source) => source.type === 'notion' && source.isActive);
+    if (!source) {
+      return null;
+    }
+    const result = await integrationService.notionValidate(source.id);
     return {
-      name: data.name,
-      icon: data.avatar_url || '🤖',
-      workspaceName: data.bot?.owner?.workspace ? 'Notion Workspace' : undefined
+      name: result.name || 'Notion Integration',
+      icon: result.icon || '🤖',
+      workspaceName: result.workspaceName
     };
   } catch (error) {
-    console.error("Token Validation Error:", error);
+    console.error('Notion validation failed:', error);
     return null;
   }
 };
 
 export const searchDatabases = async (): Promise<NotionDatabase[]> => {
   try {
-    const data = await callNotionProxy('/search', 'POST', {
-      filter: {
-        value: 'database',
-        property: 'object'
-      },
-      sort: {
-        direction: 'descending',
-        timestamp: 'last_edited_time'
-      }
-    });
-
-    return data.results.map((db: any) => ({
-      id: db.id,
-      title: db.title?.[0]?.plain_text || 'Untitled Database',
-      icon: db.icon?.emoji || '📅',
-      url: db.url,
-      lastEdited: db.last_edited_time
+    const config = await integrationService.getConfig();
+    const source = config.sources.find((entry) => entry.type === 'notion' && entry.isActive);
+    if (!source) {
+      return [];
+    }
+    const entries = await integrationService.notionListDatabases(source.id);
+    return entries.map((entry) => ({
+      id: entry.id,
+      title: entry.title || entry.id,
+      icon: '🗂️',
+      url: entry.url,
+      lastEdited: entry.lastEdited || new Date().toISOString()
     }));
   } catch (error) {
-    console.error("Database Search Error:", error);
+    console.error('Notion database search error:', error);
     return [];
   }
 };
 
 export const validateNotionConnection = async (dbId: string): Promise<boolean> => {
   try {
-    const response = await fetch(`/api/notion/databases/${dbId}`, {
-      method: 'GET',
+    const modules = await integrationService.getConfig();
+    const source = modules.sources.find((entry) => entry.type === 'notion' && entry.id === dbId) || modules.sources.find((entry) => entry.type === 'notion');
+    if (!source || !source.targetId) {
+      return false;
+    }
+    await integrationService.notionQuery(source.id, {
+      module: 'wiki' as IntegrationModuleKey,
+      page_size: 1,
+      filterAfter: undefined
     });
-    return response.ok;
+    return true;
   } catch (error) {
-    console.error("Validation Error:", error);
+    console.error('validateNotionConnection error', error);
     return false;
   }
 };
 
 export const getNotionDocs = async (): Promise<NotionResponse> => {
-  const dbId = localStorage.getItem('notion_db_id');
-
-  if (!dbId) {
-    return { docs: MOCK_NOTION_PAGES, source: 'mock' };
-  }
-
   try {
-    const data = await callNotionProxy(`/databases/${dbId}/query`, 'POST', {
-      page_size: 100,
-      sorts: [{ property: 'Last Edited', direction: 'descending' }]
-    });
+    const config = await integrationService.getConfig();
+    const source = config.sources.find((entry) => entry.type === 'notion' && entry.isActive);
+    if (!source || source.module !== 'wiki') {
+      return { docs: MOCK_NOTION_PAGES, source: 'mock' };
+    }
 
-    const docs: NotionPage[] = data.results.map((page: any) => ({
-      id: page.id,
-      title: page.properties?.Name?.title?.[0]?.plain_text || 'Untitled Page',
-      category: page.properties?.Category?.select?.name || 'General',
-      icon: page.icon?.emoji || '📄',
-      lastEdited: page.last_edited_time ? new Date(page.last_edited_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      content: "Content loaded via Notion API",
-      tags: page.properties?.Tags?.multi_select?.map((t: any) => t.name) || [],
-      syncStatus: 'synced',
-      notionUrl: page.url
+    const response = await integrationService.notionQuery(source.id, { module: 'wiki' });
+    const docs = response.results.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      category: (entry.category as NotionPage['category']) || 'General',
+      icon: '📄',
+      tags: entry.tags || [],
+      content: entry.content || 'No content.',
+      syncStatus: 'synced' as SyncStatus,
+      notionUrl: entry.notionUrl,
+      lastEdited: entry.lastEdited || new Date().toISOString().split('T')[0]
     }));
 
-    return { docs, source: 'api' };
+    if (docs.length === 0) {
+      return {
+        docs: [],
+        source: 'api'
+      };
+    }
 
+    return {
+      docs,
+      source: 'api'
+    };
   } catch (error) {
-    console.error("Notion Sync Failed:", error);
+    console.error('Notion sync failed:', error);
     return {
       docs: MOCK_NOTION_PAGES,
-      error: `Sync Failed: ${(error as Error).message}`,
-      source: 'mock'
+      source: 'mock',
+      error: `Sync Failed: ${(error as Error).message}`
     };
   }
 };
 
-export const createNotionPage = async (page: Partial<NotionPage>): Promise<{ success: boolean; id?: string; error?: string }> => {
-  const dbId = localStorage.getItem('notion_db_id');
-  if (!dbId) return { success: false, error: 'Missing Database ID' };
-
-  const payload = {
-    parent: { database_id: dbId },
-    icon: { emoji: page.icon || "🆕" },
-    properties: mapInternalToNotionProperties(page),
-    children: [
-      {
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: [{ text: { content: page.content || "New content created via PICC Platform." } }]
-        }
-      }
-    ]
-  };
-
+export const createNotionPage = async (
+  page: Partial<NotionPage>
+): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
-    const data = await callNotionProxy('/pages', 'POST', payload);
-    return { success: true, id: data.id };
+    const config = await integrationService.getConfig();
+    const source = config.sources.find((entry) => entry.type === 'notion' && entry.isActive && entry.module === 'wiki');
+    if (!source) {
+      return { success: false, error: 'Missing notion source for wiki module.' };
+    }
+
+    const result = (await integrationService.notionCreatePage(
+      source.id,
+      'wiki',
+      page,
+      safeCryptoId()
+    )) as { id?: string; pageId?: string };
+
+    return { success: true, id: result.id || result.pageId || undefined };
   } catch (error) {
-    console.error("Create Page Failed:", error);
+    console.error('Create Notion page failed:', error);
     return { success: false, error: (error as Error).message };
   }
 };
 
 export const updateNotionPage = async (id: string, updates: Partial<NotionPage>): Promise<boolean> => {
-  const payload = {
-    properties: mapInternalToNotionProperties(updates),
-    icon: updates.icon ? { emoji: updates.icon } : undefined
-  };
-
   try {
-    await callNotionProxy(`/pages/${id}`, 'PATCH', payload);
+    const config = await integrationService.getConfig();
+    const source = config.sources.find((entry) => entry.type === 'notion' && entry.isActive && entry.module === 'wiki');
+    if (!source) {
+      return false;
+    }
+    await integrationService.notionUpdatePage(source.id, id, 'wiki', updates, safeCryptoId());
     return true;
   } catch (error) {
-    console.error("Update Page Failed:", error);
+    console.error('Update Notion page failed:', error);
     return false;
   }
+};
+
+export const getNotionDocsForModule = async (module: IntegrationModuleKey): Promise<NotionPage[]> => {
+  const source = (await integrationService.getConfig()).sources.find(
+    (entry) => entry.type === 'notion' && entry.isActive && entry.module === module
+  );
+  if (!source) {
+    return [];
+  }
+  const response = await integrationService.notionQuery(source.id, { module });
+  return response.results.map((entry) => ({
+    id: entry.id,
+    title: entry.title,
+    category: (entry.category as NotionPage['category']) || 'General',
+    tags: entry.tags || [],
+    content: entry.content || '',
+    icon: '📄',
+    notionUrl: entry.notionUrl,
+    lastEdited: entry.lastEdited || new Date().toISOString().split('T')[0],
+    syncStatus: 'synced'
+  }));
 };
