@@ -5,18 +5,14 @@ import { prewarmTerritoryGeocodeCache } from '@/lib/server/notion-territory';
 export const dynamic = 'force-dynamic';
 
 function isAuthorized(request: Request) {
-  const cronHeader = request.headers.get('x-vercel-cron');
-  if (cronHeader) {
-    return true;
-  }
-
   const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
-    return false;
+  if (secret) {
+    const authHeader = request.headers.get('authorization') ?? '';
+    return authHeader === `Bearer ${secret}`;
   }
 
-  const authHeader = request.headers.get('authorization') ?? '';
-  return authHeader === `Bearer ${secret}`;
+  const cronHeader = request.headers.get('x-vercel-cron');
+  return Boolean(cronHeader);
 }
 
 export async function GET(request: Request) {
