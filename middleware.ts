@@ -3,9 +3,14 @@ import { NextResponse } from 'next/server';
 import { DEMO_MODE } from '@/lib/config/runtime';
 
 const isProtectedRoute = createRouteMatcher(['/(main)(.*)', '/api/(.*)']);
+const isCronSyncRoute = createRouteMatcher(['/api/cron/notion-sync']);
 const hasClerkEnv = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
 
 const protectedMiddleware = clerkMiddleware(async (auth, req) => {
+  if (isCronSyncRoute(req)) {
+    return;
+  }
+
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
