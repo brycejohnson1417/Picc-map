@@ -41,13 +41,10 @@ export async function guard(allowedRoles?: AppRole[]) {
     return { error: NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }) };
   }
 
-  if (!orgId) {
-    return { error: NextResponse.json({ error: 'Organization required' }, { status: 400 }) };
-  }
-
-  let workspaceOrgId = orgId;
+  const workspaceKey = orgId ?? `user_${userId}`;
+  let workspaceOrgId = workspaceKey;
   try {
-    workspaceOrgId = await ensureWorkspaceAndMembership(orgId, userId);
+    workspaceOrgId = await ensureWorkspaceAndMembership(workspaceKey, userId);
   } catch {
     return { error: NextResponse.json({ error: 'Workspace bootstrap failed' }, { status: 500 }) };
   }

@@ -16,11 +16,8 @@ export async function withOrg() {
     throw NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
-  if (!orgId) {
-    throw NextResponse.json({ error: 'Organization required' }, { status: 400 });
-  }
-
-  const workspaceOrgId = await ensureWorkspaceAndMembership(orgId, userId);
+  const workspaceKey = orgId ?? `user_${userId}`;
+  const workspaceOrgId = await ensureWorkspaceAndMembership(workspaceKey, userId);
   return { userId, orgId: workspaceOrgId };
 }
 

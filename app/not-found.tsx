@@ -7,7 +7,7 @@ export default function NotFound() {
       <h1 className="text-h1 font-bold">Page not found</h1>
       <p className="max-w-md text-slate-500">The page you requested doesn’t exist in this workspace.</p>
       <Button asChild>
-        <Link href="/dashboard">Go to dashboard</Link>
+        <Link href="/territory">Go to territory</Link>
       </Button>
     </div>
   );

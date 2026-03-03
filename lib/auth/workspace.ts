@@ -13,10 +13,7 @@ export async function requireWorkspaceContext() {
     throw new Error('UNAUTHENTICATED');
   }
 
-  if (!orgId) {
-    throw new Error('NO_ORGANIZATION');
-  }
-
-  const workspaceOrgId = await ensureWorkspaceAndMembership(orgId, userId);
+  const workspaceKey = orgId ?? `user_${userId}`;
+  const workspaceOrgId = await ensureWorkspaceAndMembership(workspaceKey, userId);
   return { userId, orgId: workspaceOrgId };
 }

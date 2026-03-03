@@ -50,11 +50,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
     redirect('/sign-in');
   }
 
-  if (!orgId) {
-    redirect('/');
-  }
-
-  await ensureWorkspaceAndMembership(orgId, userId);
+  const workspaceKey = orgId ?? `user_${userId}`;
+  await ensureWorkspaceAndMembership(workspaceKey, userId);
 
   return <AppShell>{children}</AppShell>;
 }
