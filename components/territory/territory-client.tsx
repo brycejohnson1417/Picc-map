@@ -20,12 +20,15 @@ export function TerritoryClient() {
   const [routeMode, setRouteMode] = useState<RouteMode>('car');
   const [optimizing, setOptimizing] = useState(false);
   const [optimizedRoute, setOptimizedRoute] = useState<TerritoryOptimizedRouteResponse | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   const storesQuery = useQuery({
-    queryKey: ['territory-stores', selectedStatuses.join('|'), selectedReps.join('|'), search],
+    queryKey: ['territory-stores', selectedStatuses.join('|'), selectedReps.join('|'), search, refreshNonce],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.set('refresh', '1');
+      if (refreshNonce > 0) {
+        params.set('refresh', '1');
+      }
       if (search.trim()) params.set('q', search.trim());
       for (const status of selectedStatuses) params.append('status', status);
       for (const rep of selectedReps) params.append('rep', rep);
@@ -221,7 +224,7 @@ export function TerritoryClient() {
         </div>
 
         <div className="absolute right-3 top-[12.6rem] z-[1000]">
-          <Button variant="secondary" size="sm" onClick={() => storesQuery.refetch()}>
+          <Button variant="secondary" size="sm" onClick={() => setRefreshNonce((value) => value + 1)}>
             <RefreshCw className="mr-1 h-4 w-4" />
             Refresh
           </Button>

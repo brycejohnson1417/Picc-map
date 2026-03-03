@@ -7,7 +7,7 @@ import { colorForStatus, normalizeStatus, type TerritoryStoresResponse, type Ter
 const NOTION_API_BASE = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
-const GEOCODE_THROTTLE_MS = 1200;
+const GEOCODE_THROTTLE_MS = 250;
 
 const REQUIRED_PROPERTIES = [
   { name: 'Dispensary Name', type: 'title' },
@@ -269,6 +269,7 @@ async function geocodeAddressWithCache(address: string, budget: GeoBudget, allow
       'Accept-Language': 'en',
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(3000),
   });
 
   if (!response.ok) {
@@ -391,7 +392,7 @@ export async function loadTerritoryStores(input?: {
   };
 
   const geocodeBudget: GeoBudget = {
-    remaining: Math.max(0, input?.maxLiveGeocodeLookups ?? (input?.refresh ? 30 : 8)),
+    remaining: Math.max(0, input?.maxLiveGeocodeLookups ?? (input?.refresh ? 8 : 0)),
     lookedUp: 0,
   };
 
