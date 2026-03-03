@@ -71,6 +71,7 @@ interface GeoBudget {
 
 let lastGeocodeLookupAt = 0;
 let geocodeTableEnsured = false;
+const memoryGeocodeCache = new Map<string, { lat: number; lng: number; formattedAddress: string }>();
 
 function requiredEnv(name: 'NOTION_API_KEY' | 'NOTION_MASTER_LIST_DATABASE_ID') {
   const value = process.env[name]?.trim();
@@ -175,25 +176,29 @@ async function ensureGeocodeCacheTable() {
     return;
   }
 
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "SpatialGeocodeCache" (
-      "id" TEXT NOT NULL,
-      "addressNormalized" TEXT NOT NULL,
-      "lat" DOUBLE PRECISION NOT NULL,
-      "lng" DOUBLE PRECISION NOT NULL,
-      "formattedAddress" TEXT,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL,
-      CONSTRAINT "SpatialGeocodeCache_pkey" PRIMARY KEY ("id")
-    )
-  `);
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SpatialGeocodeCache" (
+        "id" TEXT NOT NULL,
+        "addressNormalized" TEXT NOT NULL,
+        "lat" DOUBLE PRECISION NOT NULL,
+        "lng" DOUBLE PRECISION NOT NULL,
+        "formattedAddress" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL,
+        CONSTRAINT "SpatialGeocodeCache_pkey" PRIMARY KEY ("id")
+      )
+    `);
 
-  await prisma.$executeRawUnsafe(`
-    CREATE UNIQUE INDEX IF NOT EXISTS "SpatialGeocodeCache_addressNormalized_key"
-    ON "SpatialGeocodeCache"("addressNormalized")
-  `);
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "SpatialGeocodeCache_addressNormalized_key"
+      ON "SpatialGeocodeCache"("addressNormalized")
+    `);
 
-  geocodeTableEnsured = true;
+    geocodeTableEnsured = true;
+  } catch {
+    geocodeTableEnsured = false;
+  }
 }
 
 async function geocodeAddressWithCache(address: string, budget: GeoBudget, allowLiveLookup: boolean) {
@@ -202,18 +207,39 @@ async function geocodeAddressWithCache(address: string, budget: GeoBudget, allow
     return null;
   }
 
+  const memoryCached = memoryGeocodeCache.get(addressNormalized);
+  if (memoryCached) {
+    return {
+      lat: memoryCached.lat,
+      lng: memoryCached.lng,
+      formattedAddress: memoryCached.formattedAddress,
+      source: 'nominatim-cache' as const,
+    };
+  }
+
   await ensureGeocodeCacheTable();
 
-  const cachedRows = await prisma.$queryRaw<Array<{ lat: number; lng: number; formattedAddress: string | null }>>`
-    SELECT "lat", "lng", "formattedAddress"
-    FROM "SpatialGeocodeCache"
-    WHERE "addressNormalized" = ${addressNormalized}
-    LIMIT 1
-  `;
-
-  const cached = cachedRows[0];
+  let cached: { lat: number; lng: number; formattedAddress: string | null } | undefined;
+  if (geocodeTableEnsured) {
+    try {
+      const cachedRows = await prisma.$queryRaw<Array<{ lat: number; lng: number; formattedAddress: string | null }>>`
+        SELECT "lat", "lng", "formattedAddress"
+        FROM "SpatialGeocodeCache"
+        WHERE "addressNormalized" = ${addressNormalized}
+        LIMIT 1
+      `;
+      cached = cachedRows[0];
+    } catch {
+      cached = undefined;
+    }
+  }
 
   if (cached) {
+    memoryGeocodeCache.set(addressNormalized, {
+      lat: cached.lat,
+      lng: cached.lng,
+      formattedAddress: cached.formattedAddress ?? address,
+    });
     return {
       lat: cached.lat,
       lng: cached.lng,
@@ -263,16 +289,28 @@ async function geocodeAddressWithCache(address: string, budget: GeoBudget, allow
 
   const formattedAddress = match.display_name ?? address;
 
-  await prisma.$executeRaw`
-    INSERT INTO "SpatialGeocodeCache" ("id", "addressNormalized", "lat", "lng", "formattedAddress", "createdAt", "updatedAt")
-    VALUES (${randomUUID()}, ${addressNormalized}, ${lat}, ${lng}, ${formattedAddress}, NOW(), NOW())
-    ON CONFLICT ("addressNormalized")
-    DO UPDATE SET
-      "lat" = EXCLUDED."lat",
-      "lng" = EXCLUDED."lng",
-      "formattedAddress" = EXCLUDED."formattedAddress",
-      "updatedAt" = NOW()
-  `;
+  memoryGeocodeCache.set(addressNormalized, {
+    lat,
+    lng,
+    formattedAddress,
+  });
+
+  if (geocodeTableEnsured) {
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO "SpatialGeocodeCache" ("id", "addressNormalized", "lat", "lng", "formattedAddress", "createdAt", "updatedAt")
+        VALUES (${randomUUID()}, ${addressNormalized}, ${lat}, ${lng}, ${formattedAddress}, NOW(), NOW())
+        ON CONFLICT ("addressNormalized")
+        DO UPDATE SET
+          "lat" = EXCLUDED."lat",
+          "lng" = EXCLUDED."lng",
+          "formattedAddress" = EXCLUDED."formattedAddress",
+          "updatedAt" = NOW()
+      `;
+    } catch {
+      // If DB cache write fails, keep serving live geocoded values from memory for this runtime.
+    }
+  }
 
   return {
     lat,
