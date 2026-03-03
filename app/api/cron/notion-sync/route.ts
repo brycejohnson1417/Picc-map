@@ -24,18 +24,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [territory, crm] = await Promise.allSettled([prewarmTerritoryGeocodeCache(), prewarmLiveCrmCaches()]);
+  const territory = await prewarmTerritoryGeocodeCache().then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+  const crm = await prewarmLiveCrmCaches().then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
 
   const body = {
-    ok: territory.status === 'fulfilled' || crm.status === 'fulfilled',
-    territory:
-      territory.status === 'fulfilled'
-        ? territory.value
-        : { error: territory.reason instanceof Error ? territory.reason.message : 'Territory sync failed' },
-    crm:
-      crm.status === 'fulfilled'
-        ? crm.value
-        : { error: crm.reason instanceof Error ? crm.reason.message : 'CRM sync failed' },
+    ok: territory.ok || crm.ok,
+    territory: territory.ok ? territory.value : { error: territory.error instanceof Error ? territory.error.message : 'Territory sync failed' },
+    crm: crm.ok ? crm.value : { error: crm.error instanceof Error ? crm.error.message : 'CRM sync failed' },
     syncedAt: new Date().toISOString(),
   };
 

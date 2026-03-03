@@ -33,23 +33,40 @@ function asIsoString(value: Date | string | null | undefined) {
   return date.toISOString();
 }
 
+function isDuplicateCreateError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('NotionCacheSnapshot') &&
+    (error.message.includes('already exists') || error.message.includes('Code: `23505`'))
+  );
+}
+
 export async function ensureNotionCacheSnapshotTable() {
   if (snapshotTableEnsured) {
     return;
   }
 
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "NotionCacheSnapshot" (
-      "key" TEXT NOT NULL,
-      "payload" JSONB NOT NULL,
-      "recordsRead" INTEGER NOT NULL DEFAULT 0,
-      "unresolvedLocationCount" INTEGER NOT NULL DEFAULT 0,
-      "lastEditedMax" TIMESTAMPTZ,
-      "syncedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      CONSTRAINT "NotionCacheSnapshot_pkey" PRIMARY KEY ("key")
-    )
-  `);
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "NotionCacheSnapshot" (
+        "key" TEXT NOT NULL,
+        "payload" JSONB NOT NULL,
+        "recordsRead" INTEGER NOT NULL DEFAULT 0,
+        "unresolvedLocationCount" INTEGER NOT NULL DEFAULT 0,
+        "lastEditedMax" TIMESTAMPTZ,
+        "syncedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "NotionCacheSnapshot_pkey" PRIMARY KEY ("key")
+      )
+    `);
+  } catch (error) {
+    if (!isDuplicateCreateError(error)) {
+      throw error;
+    }
+  }
 
   snapshotTableEnsured = true;
 }
