@@ -32,6 +32,14 @@ export async function GET(request: Request) {
       refresh,
     });
 
+    console.log('territory_stores_ok', {
+      recordsRead: payload.meta.recordsRead,
+      returned: payload.stores.length,
+      unresolvedLocationCount: payload.meta.unresolvedLocationCount,
+      geocodedThisRequest: payload.meta.geocodedThisRequest,
+      refresh,
+    });
+
     return NextResponse.json(payload, {
       headers: {
         'X-Territory-Data-Source': 'notion-live',
@@ -39,6 +47,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Territory store fetch failed';
+    console.error('territory_stores_error', { message, refresh, statusesCount: statuses.length, repsCount: reps.length, hasQuery: Boolean(q) });
     return NextResponse.json(
       {
         error: message,
