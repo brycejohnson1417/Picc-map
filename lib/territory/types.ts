@@ -15,6 +15,10 @@ export interface TerritoryStorePin {
   locationAddress: string | null;
   locationSource: 'notion-place' | 'nominatim-cache' | 'nominatim-live';
   lastEditedTime: string;
+  licenseNumber?: string | null;
+  city?: string | null;
+  state?: string | null;
+  daysOverdue?: number | null;
 }
 
 export interface TerritoryFilterCount {
@@ -29,11 +33,14 @@ export interface TerritoryStoresResponse {
     reps: TerritoryFilterCount[];
   };
   meta: {
-    dataSource: 'notion-live';
+    dataSource: 'notion-live-cache' | 'notion-live-cache-stale';
     lastEditedMax: string | null;
     recordsRead: number;
     unresolvedLocationCount: number;
     geocodedThisRequest: number;
+    syncedAt: string | null;
+    stale: boolean;
+    syncError: string | null;
   };
 }
 

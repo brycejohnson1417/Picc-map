@@ -1,6 +1,4 @@
 'use client';
-
-import Link from 'next/link';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AdvancedDataTable } from '@/components/crm/advanced-data-table';
 import { Badge } from '@/components/ui';
@@ -25,9 +23,7 @@ const columns: ColumnDef<AccountTableRow>[] = [
     header: 'Dispensary',
     cell: ({ row }) => (
       <div>
-        <Link className="font-semibold text-primary hover:underline" href={`/accounts/${row.original.id}`}>
-          {row.original.name}
-        </Link>
+        <span className="font-semibold text-primary">{row.original.name}</span>
         <p className="text-xs text-slate-500">{row.original.licenseNumber}</p>
       </div>
     ),

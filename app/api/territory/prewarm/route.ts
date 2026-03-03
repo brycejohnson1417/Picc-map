@@ -14,7 +14,7 @@ export async function POST() {
     const payload = await prewarmTerritoryGeocodeCache();
     return NextResponse.json(payload, {
       headers: {
-        'X-Territory-Data-Source': 'notion-live',
+        'X-Territory-Data-Source': 'notion-live-cache',
       },
     });
   } catch (error) {
@@ -26,7 +26,7 @@ export async function POST() {
       {
         status: 500,
         headers: {
-          'X-Territory-Data-Source': 'notion-live',
+          'X-Territory-Data-Source': 'notion-live-cache',
         },
       },
     );

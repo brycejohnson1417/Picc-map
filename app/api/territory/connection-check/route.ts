@@ -14,7 +14,7 @@ export async function GET() {
     const payload = await territoryConnectionCheck();
     return NextResponse.json(payload, {
       headers: {
-        'X-Territory-Data-Source': 'notion-live',
+        'X-Territory-Data-Source': 'notion-live-cache',
       },
     });
   } catch (error) {
@@ -28,7 +28,7 @@ export async function GET() {
       {
         status: 500,
         headers: {
-          'X-Territory-Data-Source': 'notion-live',
+          'X-Territory-Data-Source': 'notion-live-cache',
         },
       },
     );

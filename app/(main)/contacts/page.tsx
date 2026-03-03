@@ -1,25 +1,8 @@
-import { requireWorkspaceContext } from '@/lib/auth/workspace';
 import { ContactsTable } from '@/components/crm/contacts-table';
-import { prisma } from '@/lib/db/prisma';
+import { loadLiveNotionContacts } from '@/lib/server/notion-live-crm';
 
 export default async function ContactsPage() {
-  const { orgId } = await requireWorkspaceContext();
-
-  const contacts = await prisma.contact.findMany({
-    where: { orgId },
-    include: { account: true, opportunities: true, tasks: true, activityLogs: { take: 1, orderBy: { createdAt: 'desc' } } },
-    orderBy: { updatedAt: 'desc' },
-  });
-  const rows = contacts.map((row) => ({
-    id: row.id,
-    name: `${row.firstName} ${row.lastName}`,
-    roleTitle: row.roleTitle,
-    accountName: row.account.name,
-    email: row.email ?? '—',
-    phone: row.phone ?? '—',
-    status: row.status,
-    linkedWork: `${row.opportunities.length} opps · ${row.tasks.length} tasks`,
-  }));
+  const rows = await loadLiveNotionContacts();
 
   return (
     <div className="space-y-6">

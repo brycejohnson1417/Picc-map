@@ -37,12 +37,14 @@ export async function GET(request: Request) {
       returned: payload.stores.length,
       unresolvedLocationCount: payload.meta.unresolvedLocationCount,
       geocodedThisRequest: payload.meta.geocodedThisRequest,
+      syncedAt: payload.meta.syncedAt,
+      stale: payload.meta.stale,
       refresh,
     });
 
     return NextResponse.json(payload, {
       headers: {
-        'X-Territory-Data-Source': 'notion-live',
+        'X-Territory-Data-Source': payload.meta.dataSource,
       },
     });
   } catch (error) {
@@ -55,7 +57,7 @@ export async function GET(request: Request) {
       {
         status: 500,
         headers: {
-          'X-Territory-Data-Source': 'notion-live',
+          'X-Territory-Data-Source': 'notion-live-cache',
         },
       },
     );

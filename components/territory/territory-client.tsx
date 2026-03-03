@@ -239,6 +239,12 @@ export function TerritoryClient() {
           onSelectStore={(storeId) => setFocusedStoreId(storeId)}
         />
 
+        {stores.length === 0 ? (
+          <div className="absolute left-2 right-2 top-1/2 z-[1000] -translate-y-1/2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-center text-sm text-amber-900 md:left-1/2 md:right-auto md:w-[520px] md:-translate-x-1/2">
+            No mapped stores available yet. Tap Refresh to force a live Notion sync and geocode missing addresses.
+          </div>
+        ) : null}
+
         {focusedStore ? (
           <div className="absolute bottom-80 left-2 right-2 z-[1000] rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-950 md:left-4 md:right-auto md:w-[360px]">
             <div className="flex items-start justify-between gap-2">
@@ -286,9 +292,12 @@ export function TerritoryClient() {
 
       <div className="border-t border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">
         <p>
-          Source: live Notion ({storesQuery.data?.meta.recordsRead ?? 0} rows read, unresolved locations: {storesQuery.data?.meta.unresolvedLocationCount ?? 0}, last edit:{' '}
+          Source: live Notion cache ({storesQuery.data?.meta.recordsRead ?? 0} rows read, unresolved locations: {storesQuery.data?.meta.unresolvedLocationCount ?? 0}, synced:{' '}
+          {storesQuery.data?.meta.syncedAt ? new Date(storesQuery.data.meta.syncedAt).toLocaleString() : 'n/a'}, last edit:{' '}
           {storesQuery.data?.meta.lastEditedMax ? new Date(storesQuery.data.meta.lastEditedMax).toLocaleString() : 'n/a'})
         </p>
+        {storesQuery.data?.meta.stale ? <p className="text-amber-600">Showing stale cache while Notion sync recovers.</p> : null}
+        {storesQuery.data?.meta.syncError ? <p className="text-amber-600">{storesQuery.data.meta.syncError}</p> : null}
       </div>
     </div>
   );
