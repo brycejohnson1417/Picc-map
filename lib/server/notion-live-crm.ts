@@ -15,6 +15,7 @@ const NOTION_VERSION = '2022-06-28';
 const CONTACTS_DB_FALLBACK = '3bce11e6de354ca0bac75ed6114a1b0f';
 const CONTACTS_SNAPSHOT_KEY = 'crm-contacts-v1';
 const DEFAULT_CONTACTS_SYNC_TTL_MINUTES = 20;
+let contactsSyncInFlight: Promise<void> | null = null;
 
 interface NotionPage {
   id: string;
@@ -286,6 +287,20 @@ async function syncContactsSnapshotFromNotion() {
   };
 }
 
+function startContactsBackgroundSync() {
+  if (contactsSyncInFlight) {
+    return;
+  }
+
+  contactsSyncInFlight = syncContactsSnapshotFromNotion()
+    .catch(() => {
+      // Background refresh failures should not block reads from existing cache.
+    })
+    .finally(() => {
+      contactsSyncInFlight = null;
+    });
+}
+
 async function getCachedContacts(input?: { refresh?: boolean }) {
   const ttlMinutes = getSyncTtlMinutes(DEFAULT_CONTACTS_SYNC_TTL_MINUTES);
   let snapshot = await readNotionCacheSnapshot<CachedContactRow[]>(CONTACTS_SNAPSHOT_KEY);
@@ -305,17 +320,25 @@ async function getCachedContacts(input?: { refresh?: boolean }) {
     isSnapshotStale(snapshot.syncedAt, ttlMinutes);
 
   if (needsSync) {
-    try {
-      const synced = await syncContactsSnapshotFromNotion();
-      return {
-        rows: synced.rows,
-        syncedAt: new Date().toISOString(),
-      };
-    } catch (error) {
-      if (!snapshot) {
-        throw error;
-      }
+    if (input?.refresh || !snapshot || snapshot.payload.length === 0) {
+      try {
+        const synced = await syncContactsSnapshotFromNotion();
+        return {
+          rows: synced.rows,
+          syncedAt: new Date().toISOString(),
+        };
+      } catch (error) {
+        if (!snapshot) {
+          throw error;
+        }
 
+        return {
+          rows: snapshot.payload,
+          syncedAt: snapshot.syncedAt,
+        };
+      }
+    } else {
+      startContactsBackgroundSync();
       return {
         rows: snapshot.payload,
         syncedAt: snapshot.syncedAt,

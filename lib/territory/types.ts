@@ -40,6 +40,7 @@ export interface TerritoryStoresResponse {
     geocodedThisRequest: number;
     syncedAt: string | null;
     stale: boolean;
+    syncing: boolean;
     syncError: string | null;
   };
 }

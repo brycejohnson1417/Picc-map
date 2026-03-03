@@ -296,6 +296,7 @@ export function TerritoryClient() {
           {storesQuery.data?.meta.syncedAt ? new Date(storesQuery.data.meta.syncedAt).toLocaleString() : 'n/a'}, last edit:{' '}
           {storesQuery.data?.meta.lastEditedMax ? new Date(storesQuery.data.meta.lastEditedMax).toLocaleString() : 'n/a'})
         </p>
+        {storesQuery.data?.meta.syncing ? <p className="text-slate-600">Refreshing live Notion data in background.</p> : null}
         {storesQuery.data?.meta.stale ? <p className="text-amber-600">Showing stale cache while Notion sync recovers.</p> : null}
         {storesQuery.data?.meta.syncError ? <p className="text-amber-600">{storesQuery.data.meta.syncError}</p> : null}
       </div>

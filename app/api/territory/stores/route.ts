@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       geocodedThisRequest: payload.meta.geocodedThisRequest,
       syncedAt: payload.meta.syncedAt,
       stale: payload.meta.stale,
+      syncing: payload.meta.syncing,
       refresh,
     });
 

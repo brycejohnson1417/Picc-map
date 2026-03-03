@@ -88,6 +88,7 @@ interface TerritorySnapshotMeta {
   geocodedThisRequest: number;
   syncedAt: string | null;
   stale: boolean;
+  syncing: boolean;
   syncError: string | null;
 }
 
@@ -99,6 +100,8 @@ interface TerritorySnapshotResult {
 let lastGeocodeLookupAt = 0;
 let geocodeTableEnsured = false;
 const memoryGeocodeCache = new Map<string, { lat: number; lng: number; formattedAddress: string }>();
+let territorySyncInFlight: Promise<void> | null = null;
+let territoryLastSyncError: string | null = null;
 
 function requiredEnv(name: 'NOTION_API_KEY' | 'NOTION_MASTER_LIST_DATABASE_ID') {
   const value = process.env[name]?.trim();
@@ -551,6 +554,23 @@ async function syncTerritorySnapshotFromNotion(input?: { maxLiveGeocodeLookups?:
   };
 }
 
+function startTerritoryBackgroundSync(input?: { maxLiveGeocodeLookups?: number }) {
+  if (territorySyncInFlight) {
+    return;
+  }
+
+  territorySyncInFlight = syncTerritorySnapshotFromNotion(input)
+    .then(() => {
+      territoryLastSyncError = null;
+    })
+    .catch((error) => {
+      territoryLastSyncError = error instanceof Error ? error.message : 'Territory sync failed';
+    })
+    .finally(() => {
+      territorySyncInFlight = null;
+    });
+}
+
 async function getTerritorySnapshot(input?: {
   refresh?: boolean;
   maxLiveGeocodeLookups?: number;
@@ -574,25 +594,35 @@ async function getTerritorySnapshot(input?: {
 
   let geocodedThisRequest = 0;
   let stale = false;
-  let syncError: string | null = null;
+  let syncError: string | null = territoryLastSyncError;
+  let syncing = Boolean(territorySyncInFlight);
 
   if (shouldSync) {
     const defaultGeocodeBudget = input?.refresh
       ? parsePositiveInt(process.env.TERRITORY_FORCE_SYNC_GEOCODE_LOOKUPS, DEFAULT_FORCE_SYNC_GEOCODE_LOOKUPS)
       : parsePositiveInt(process.env.TERRITORY_STALE_SYNC_GEOCODE_LOOKUPS, DEFAULT_STALE_SYNC_GEOCODE_LOOKUPS);
 
-    try {
-      const synced = await syncTerritorySnapshotFromNotion({
+    if (input?.refresh || !cached || cached.payload.length === 0) {
+      try {
+        const synced = await syncTerritorySnapshotFromNotion({
+          maxLiveGeocodeLookups: input?.maxLiveGeocodeLookups ?? defaultGeocodeBudget,
+        });
+        cached = synced.snapshot;
+        geocodedThisRequest = synced.geocodedThisSync;
+        syncError = null;
+      } catch (error) {
+        syncError = error instanceof Error ? error.message : 'Territory sync failed';
+        if (!cached) {
+          throw error;
+        }
+        stale = true;
+      }
+    } else {
+      stale = true;
+      startTerritoryBackgroundSync({
         maxLiveGeocodeLookups: input?.maxLiveGeocodeLookups ?? defaultGeocodeBudget,
       });
-      cached = synced.snapshot;
-      geocodedThisRequest = synced.geocodedThisSync;
-    } catch (error) {
-      syncError = error instanceof Error ? error.message : 'Territory sync failed';
-      if (!cached) {
-        throw error;
-      }
-      stale = true;
+      syncing = true;
     }
   }
 
@@ -610,6 +640,7 @@ async function getTerritorySnapshot(input?: {
       geocodedThisRequest,
       syncedAt: cached.syncedAt,
       stale,
+      syncing,
       syncError,
     },
   };
