@@ -293,8 +293,10 @@ function startContactsBackgroundSync() {
   }
 
   contactsSyncInFlight = syncContactsSnapshotFromNotion()
+    .then(() => undefined)
     .catch(() => {
       // Background refresh failures should not block reads from existing cache.
+      return undefined;
     })
     .finally(() => {
       contactsSyncInFlight = null;
