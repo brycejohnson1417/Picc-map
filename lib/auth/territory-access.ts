@@ -1,0 +1,95 @@
+import 'server-only';
+
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+
+interface AccessResult {
+  ok: boolean;
+  status: number;
+  error?: string;
+  email?: string;
+}
+
+function parseCsv(value: string | undefined) {
+  return new Set(
+    (value ?? '')
+      .split(',')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function getAllowlist() {
+  return parseCsv(process.env.TERRITORY_ALLOWED_EMAILS);
+}
+
+function getAdminAllowlist(allowlist: Set<string>) {
+  const explicitAdmins = parseCsv(process.env.TERRITORY_ADMIN_EMAILS);
+  if (explicitAdmins.size > 0) {
+    return explicitAdmins;
+  }
+
+  if (allowlist.has('*')) {
+    return new Set(['*']);
+  }
+
+  const fallbackFirst = [...allowlist][0];
+  return fallbackFirst ? new Set([fallbackFirst]) : new Set<string>();
+}
+
+export async function checkTerritoryAccess(opts?: { requireAdmin?: boolean }): Promise<AccessResult> {
+  const { userId } = await auth();
+  if (!userId) {
+    return { ok: false, status: 401, error: 'Unauthenticated' };
+  }
+
+  const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses[0]?.emailAddress;
+  if (!email) {
+    return { ok: false, status: 403, error: 'User email not found' };
+  }
+
+  const allowlist = getAllowlist();
+  if (allowlist.size === 0) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'TERRITORY_ALLOWED_EMAILS is not configured',
+    };
+  }
+
+  const normalizedEmail = email.toLowerCase();
+  const allowAll = allowlist.has('*');
+  if (!allowAll && !allowlist.has(normalizedEmail)) {
+    return { ok: false, status: 403, error: 'Access denied for this user' };
+  }
+
+  if (opts?.requireAdmin) {
+    const adminAllowlist = getAdminAllowlist(allowlist);
+    if (!adminAllowlist.has('*') && !adminAllowlist.has(normalizedEmail)) {
+      return { ok: false, status: 403, error: 'Admin access required' };
+    }
+  }
+
+  return { ok: true, status: 200, email: normalizedEmail };
+}
+
+export async function requireTerritoryApiAccess(opts?: { requireAdmin?: boolean }) {
+  const result = await checkTerritoryAccess(opts);
+  if (!result.ok) {
+    return {
+      error: NextResponse.json(
+        {
+          error: result.error,
+        },
+        {
+          status: result.status,
+        },
+      ),
+    };
+  }
+
+  return {
+    email: result.email!,
+  };
+}

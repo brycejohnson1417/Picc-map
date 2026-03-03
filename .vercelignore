@@ -1,0 +1,14 @@
+# Legacy pre-Next app artifacts (root only)
+/src/
+/api/
+/dist/
+/index.html
+/vite.config.ts
+/tsconfig.node.json
+/legacy/
+
+# Local build/cache
+/.next/
+/.next_backup_*/
+*.tsbuildinfo
+/node_modules/

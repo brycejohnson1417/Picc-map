@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --background: 248 250 252;
+  --foreground: 15 23 42;
+  --card: 255 255 255;
+  --card-foreground: 15 23 42;
+  --muted: 100 116 139;
+  --primary: 59 130 246;
+  --border: 226 232 240;
+}
+
+.dark {
+  --background: 2 6 23;
+  --foreground: 226 232 240;
+  --card: 15 23 42;
+  --card-foreground: 226 232 240;
+  --muted: 148 163 184;
+  --primary: 59 130 246;
+  --border: 51 65 85;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+body {
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.4);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

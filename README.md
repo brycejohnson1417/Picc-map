@@ -1,246 +1,180 @@
-# PICC Platform Intranet - Vercel Deployment
+# PICC Dispensary CRM (Next.js 15)
 
-Production-ready PICC Command Center application built with React, TypeScript, Vite, and Vercel serverless functions.
+Account-centric CRM for cannabis dispensary sales, ops, finance, and brand ambassador workflows.
 
-## Architecture
+## Stack
+- Next.js 15 App Router + TypeScript strict
+- Tailwind CSS v4 + Radix + shadcn-style primitives
+- TanStack Table v8 + TanStack Query v5
+- Prisma + PostgreSQL
+- Clerk Organizations auth
+- Zod + React Hook Form + Sonner + date-fns + Recharts + cmdk + framer-motion
 
-### Frontend (React + Vite)
-- **Location**: `/src`
-- **Components**: Modular React components with TypeScript
-- **Styling**: Tailwind CSS
-- **State**: React hooks with localStorage for persistence
-- **API Integration**: Fetch API calls to `/api` routes
+## Canonical Roles (enforced)
+- `ADMIN`
+- `OPS_TEAM`
+- `SALES_REP`
+- `FINANCE`
+- `BRAND_AMBASSADOR`
 
-### Backend (Vercel Serverless Functions)
-- **Location**: `/api`
-- **Notion Proxy**: `/api/notion/[...path].ts` - Forwards requests to Notion API
-- **Gemini AI**: `/api/gemini.ts` - AI-powered assistant
-- **Inventory**: `/api/inventory.ts` (optional) - Live inventory sync
-- **Sheets**: `/api/sheets/[sheetId]/values/[range]`, `/api/sheets/[sheetId]/batch`, `/api/sheets/[sheetId]/meta` (optional) - Google Sheets integration
+No viewer role exists in this app.
 
-## Environment Variables
+## Priority Workflows Included
+- Referral tracking (`/workflows/referrals`)
+- Penny bundle credit submissions (`/workflows/penny-bundles`)
+- Overdue accounts (`/workflows/overdue`)
+- Vendor day scheduling (`/workflows/vendor-days`)
+- Sample box requests (`/workflows/sample-boxes`)
 
-Required for Vercel deployment:
+## Conversations Mode
+Conversations are fully persisted in DB but currently run in **mock mode** for outbound sends.
+- Inbox and thread behavior are production-style.
+- Provider adapters are intentionally disabled for this phase.
 
-```env
-NOTION_API_KEY=your_notion_integration_secret_token
-GEMINI_API_KEY=your_gemini_api_key
-APP_AUTH_PASSWORD=shared_password_for_fallback_login
-APP_AUTH_SECRET=random_long_secret_for_session_cookies
-```
+## Nabis + Google Sheets Integration Basis
+Workbook schema source is:
+- `/Users/brycejohnson/Downloads/Nabis Notion Master Sheet.xlsx`
 
-Optional (recommended) for Google sign-in + Sheets:
+Schema inspection endpoint:
+- `GET /api/integrations/sheets/schema`
 
-```env
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
-GOOGLE_OAUTH_ALLOWED_DOMAIN=optional_company_domain.com
-GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
-```
-
-### Getting API Keys
-
-#### Notion Integration Token
-1. Go to https://www.notion.com/my-integrations
-2. Create a new integration
-3. Copy the "Internal Integration Token"
-4. Share databases with your integration in Notion
-5. Set as `NOTION_API_KEY` in Vercel
-
-#### Gemini API Key
-1. Go to https://ai.google.dev
-2. Create a project in Google Cloud
-3. Enable the Generative AI API
-4. Create an API key
-5. Set as `GEMINI_API_KEY` in Vercel
-
-#### Google OAuth Client (optional)
-1. In Google Cloud, enable OAuth consent screen.
-2. Create a **Web** OAuth client.
-3. Add redirect/origin for your environment.
-4. Set `GOOGLE_CLIENT_ID` in Vercel.
-5. (Optional) set `GOOGLE_OAUTH_ALLOWED_DOMAIN` to restrict logins to a company domain.
-
-#### Google Sheets Service Account (optional)
-1. In Google Cloud, create a service account with Sheets API access.
-2. Generate a JSON key.
-3. Share your target spreadsheet with the service-account email.
-4. Paste full JSON into `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` (Vercel env).
-5. Set `google_sheet_id` and `google_sheet_range` in app Settings.
-
-## Deployment to Vercel
-
-### One-Click Deploy (Recommended)
-
-1. Fork this repository to your GitHub
-2. Go to https://vercel.com and sign in
-3. Click "New Project"
-4. Import your repository
-5. In "Environment Variables", add:
-   - `NOTION_API_KEY`
-   - `GEMINI_API_KEY`
-   - `APP_AUTH_PASSWORD`
-   - `APP_AUTH_SECRET`
-   - Optional: `GOOGLE_CLIENT_ID`, `GOOGLE_OAUTH_ALLOWED_DOMAIN`, `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON`
-6. Click "Deploy"
-
-### Manual Deployment
-
-```bash
-npm install -g vercel
-vercel link
-vercel env add NOTION_API_KEY
-vercel env add GEMINI_API_KEY
-vercel env add APP_AUTH_PASSWORD
-vercel env add APP_AUTH_SECRET
-# optional:
-# vercel env add GOOGLE_CLIENT_ID
-# vercel env add GOOGLE_OAUTH_ALLOWED_DOMAIN
-# vercel env add GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON
-vercel
-```
-
-## Local Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server (with API proxy)
-npm run dev
-
-# This runs:
-# - Frontend on http://localhost:5173
-# - API proxy configured in vite.config.ts
-
-# For testing API endpoints locally, start a local server or use Vercel CLI:
-vercel dev
-```
+This maps required tabs first:
+- `orders`
+- `details`
+- `Master Sales Sheet - By Store`
+- `Synced Master Sales Sheet`
+- `Payment History`
+- `Referral Orders (POSO)`
+- `Credits`
+- `Samples`
+- `Missing Stores (New Orders)`
+- `Re-Orders`
 
 ## Project Structure
-
+```txt
+app/
+  (main)/
+    accounts/
+    contacts/
+    conversations/
+    pipelines/
+    tasks/
+    calendar/
+    reports/
+    settings/
+    workflows/
+  api/
+    accounts/
+    contacts/
+    opportunities/
+    tasks/
+    appointments/
+    activity-log/
+    conversations/
+    messages/
+    workflows/
+    integrations/
+    sync/
+    command/
+components/
+  crm/
+  layout/
+  ui/
+lib/
+  auth/
+  db/
+  rbac/
+  activity-log/
+  data/
+  integrations/
+  types/
+  validation/
+prisma/
+  schema.prisma
+  seed.ts
 ```
-picc-deploy/
-├── src/
-│   ├── components/          # React components
-│   ├── services/            # API and business logic
-│   │   ├── notionService.ts
-│   │   ├── geminiService.ts
-│   │   ├── inventoryService.ts
-│   │   ├── proposalExportService.ts
-│   │   └── sheetsService.ts
-│   ├── App.tsx              # Main app component
-│   ├── types.ts             # TypeScript interfaces
-│   ├── constants.ts         # Mock data and constants
-│   └── index.tsx            # React entry point
-├── api/
-│   ├── notion/
-│   │   └── [...path].ts     # Notion API proxy
-│   ├── gemini.ts            # Gemini AI endpoint
-│   └── (optional additional endpoints)
-├── index.html               # HTML entry point
-├── vite.config.ts           # Vite configuration
-├── tsconfig.json            # TypeScript config
-├── package.json
-├── vercel.json              # Vercel routing config
-└── README.md
 
+## Local Setup
+Prerequisite:
+- Node.js LTS (`20.x` or `22.x`). Node `25.x` is not supported for this project and can cause Next build/lint hangs.
+
+1. Install deps
+```bash
+npm install
 ```
 
-## Key Features
+2. Create env file
+```bash
+cp .env.example .env.local
+```
 
-### 1. **Notion Integration**
-- Read and write pages from any connected Notion database
-- Search databases automatically
-- Create new pages from the interface
-- No API keys exposed to frontend
+3. Configure `.env.local`
+- Set `DATABASE_URL`
+- Set Clerk keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`)
+- Keep/adjust `NABIS_MASTER_SHEET_PATH`
 
-### 2. **AI Copilot**
-- Chat-based assistant powered by Gemini 2.5 Flash
-- Context-aware responses about workspace
-- Serverless execution with secure API key storage
+4. Generate Prisma client
+```bash
+npx prisma generate
+```
 
-### 3. **Proposal Builder**
-- Create and manage sales proposals
-- Product inventory management
-- Export to PDF, Excel, CSV
-- Copy to clipboard functionality
-- Customer management
+5. Run migrations
+```bash
+npx prisma migrate dev
+```
 
-### 4. **Multi-Role Dashboard**
-- Role-based views (Sales Rep, Sales Ops, Admin, Ambassador, Finance)
-- Work order tracking
-- PPP onboarding workflow
-- Service center integration
+6. Seed realistic demo data
+```bash
+npm run prisma:seed
+```
 
-### 5. **Knowledge Base**
-- Notion integration for documentation
-- Search and filter capabilities
-- Create new pages directly
+7. Start app
+```bash
+npm run dev
+```
 
-## Configuration Notes
+## Clerk Setup
+1. Create Clerk app and enable Organizations.
+2. Add local URL (`http://localhost:3000`) to allowed origins.
+3. Configure sign-in/sign-up routing to app defaults.
+4. Create users and org membership; role values in DB must be one of:
+   - `ADMIN`, `OPS_TEAM`, `SALES_REP`, `FINANCE`, `BRAND_AMBASSADOR`
 
-### Notion Database Setup
-1. Create a Notion workspace
-2. Create a database with these properties:
-   - `Name` (title)
-   - `Category` (select)
-   - `Tags` (multi-select)
-3. Create an integration and share the database with it
-4. In Settings, paste the database ID and verify connection
+## API Contract Surface
+- `/api/accounts`
+- `/api/contacts`
+- `/api/opportunities`
+- `/api/tasks`
+- `/api/appointments`
+- `/api/activity-log`
+- `/api/workflows/referrals`
+- `/api/workflows/penny-bundle-submissions`
+- `/api/workflows/overdue`
+- `/api/workflows/vendor-days`
+- `/api/workflows/sample-box-requests`
+- `/api/workflows/edit-suggestions`
+- `/api/conversations`
+- `/api/messages`
+- `/api/integrations/notion/sync-team-directory`
+- `/api/integrations/sheets/schema`
+- `/api/sync/run`
+- `/api/sync/status`
+- `/api/command/search`
 
-### Database Configuration (Vercel)
-Navigate to Settings > Integration Setup:
-- Select your Notion database
-- Click "Save Configuration"
-- Database ID is stored in browser localStorage (user-specific)
+All mutating endpoints are guarded by org scope + RBAC and write to `ActivityLog` for account-level timeline integrity.
 
-### Offline Fallback
-If Notion is unavailable, the app gracefully falls back to mock data. This allows continued productivity while connectivity is restored.
+## Deployment (Vercel)
+1. Push repo to `piccweb` remote.
+2. Import project in Vercel.
+3. Set all environment variables from `.env.example`.
+4. Add Postgres connection string (`DATABASE_URL`).
+5. Run deploy.
+6. Run production migrations:
+```bash
+npx prisma migrate deploy
+```
 
-## Security Best Practices
-
-1. **API Keys**: Never commit API keys to git. Use Vercel environment variables only.
-2. **Frontend**: No sensitive credentials in client-side code
-3. **Proxy Pattern**: All external API calls go through Vercel serverless functions
-4. **Notion Token**: Stored only on Vercel's secure environment
-5. **Gemini Key**: Stored only on Vercel's secure environment
-
-## Troubleshooting
-
-### "Missing Notion API Key" Error
-- Check that `NOTION_API_KEY` is set in Vercel environment variables
-- Verify the token is valid and not expired
-- Ensure the integration has access to your databases
-
-### Gemini API Not Working
-- Verify `GEMINI_API_KEY` is set in Vercel environment variables
-- Check that Generative AI API is enabled in Google Cloud
-- Ensure the API key has Generative AI API permissions
-
-### Proposal Export Issues
-- jsPDF and xlsx are included in dependencies
-- Browser must support file download API
-- Check console for specific export errors
-
-## Performance Optimization
-
-- **Vite**: Fast builds with ES modules
-- **Code Splitting**: Routes are lazy-loaded
-- **Caching**: API responses cached where possible
-- **Compression**: Vercel handles gzip/brotli
-- **Tree-shaking**: Unused code removed in production
-
-## Monitoring
-
-Check Vercel Dashboard for:
-- Function execution logs
-- Environment variable status
-- Deployment history
-- Edge network performance
-
-## Support & Documentation
-
-- **Notion API Docs**: https://developers.notion.com
-- **Gemini API Docs**: https://ai.google.dev/docs
-- **Vite Documentation**: https://vitejs.dev
-- **Vercel Documentation**: https://vercel.com/docs
+## Notes
+- This repo still contains legacy Vite-era folders (`src/`, `api/`) that are excluded from Next TypeScript checks.
+- Current active app is under `app/` + `components/` + `lib/` + `prisma/`.
+- On macOS, if `/Users/.../Downloads/...xlsx` returns `EPERM`, grant the terminal/Codex app Files access or move the workbook to a permitted directory and update `NABIS_MASTER_SHEET_PATH`.
