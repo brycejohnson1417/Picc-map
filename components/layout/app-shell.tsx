@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Calendar, ClipboardList, GitBranch, LayoutDashboard, MapPinned, Menu, MessageCircle, Search, Settings, Store, Users, Workflow } from 'lucide-react';
+import { Bell, LayoutDashboard, MapPinned, Menu, Search, Settings } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button, Input } from '@/components/ui';
@@ -11,14 +11,6 @@ import { CommandPalette } from '@/components/crm/command-palette';
 const navItems = [
   { href: '/territory', label: 'Territory', icon: MapPinned },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/accounts', label: 'Accounts', icon: Store },
-  { href: '/contacts', label: 'Contacts', icon: Users },
-  { href: '/pipelines', label: 'Pipelines', icon: GitBranch },
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/tasks', label: 'Tasks', icon: ClipboardList },
-  { href: '/conversations', label: 'Conversations', icon: MessageCircle },
-  { href: '/workflows', label: 'Workflows', icon: Workflow },
-  { href: '/reports', label: 'Reports', icon: Search },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -121,13 +113,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="pb-20 p-4">{children}</main>
-        <nav className="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-6 border-t bg-white p-2 dark:bg-slate-950 dark:border-slate-800">
+        <nav className="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-3 border-t bg-white p-2 dark:bg-slate-950 dark:border-slate-800">
           {[
             { href: '/territory', label: 'Map', icon: MapPinned },
-            { href: '/accounts', label: 'Accounts', icon: Store },
             { href: '/dashboard', label: 'Dash', icon: LayoutDashboard },
-            { href: '/conversations', label: 'Inbox', icon: MessageCircle },
-            { href: '/tasks', label: 'Tasks', icon: ClipboardList },
             { href: '/settings', label: 'More', icon: Settings },
           ].map((item) => {
             const Icon = item.icon;

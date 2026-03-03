@@ -353,7 +353,7 @@ export async function loadTerritoryStores(input?: {
   };
 
   const geocodeBudget: GeoBudget = {
-    remaining: Math.max(0, input?.maxLiveGeocodeLookups ?? (input?.refresh ? 8 : 0)),
+    remaining: Math.max(0, input?.maxLiveGeocodeLookups ?? (input?.refresh ? 30 : 8)),
     lookedUp: 0,
   };
 

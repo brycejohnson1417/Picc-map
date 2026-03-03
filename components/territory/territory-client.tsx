@@ -25,6 +25,7 @@ export function TerritoryClient() {
     queryKey: ['territory-stores', selectedStatuses.join('|'), selectedReps.join('|'), search],
     queryFn: async () => {
       const params = new URLSearchParams();
+      params.set('refresh', '1');
       if (search.trim()) params.set('q', search.trim());
       for (const status of selectedStatuses) params.append('status', status);
       for (const rep of selectedReps) params.append('rep', rep);
