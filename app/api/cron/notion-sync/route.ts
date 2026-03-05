@@ -68,17 +68,22 @@ export async function GET(request: Request) {
         const props = (record as any).properties;
 
         const licenseNumber = props['License Number']?.rich_text?.[0]?.plain_text || 'UNKNOWN';
-        const name = props['Name']?.title?.[0]?.plain_text || 'Unnamed Dispensary';
-        const address1 = props['Address Line 1']?.rich_text?.[0]?.plain_text || '';
-        const address2 = props['Address Line 2']?.rich_text?.[0]?.plain_text || null;
+        const name = props['Dispensary Name']?.title?.[0]?.plain_text || 'Unnamed Dispensary';
+        const fullAddr = props['Full Address']?.rich_text?.[0]?.plain_text || '';
         const city = props['City']?.rich_text?.[0]?.plain_text || '';
-        const state = props['State']?.select?.name || 'MI';
-        const zipcode = props['Zip Code']?.rich_text?.[0]?.plain_text || '';
-        const phone = props['Phone Number']?.phone_number || null;
+        const zipcode = props['Zipcode']?.rich_text?.[0]?.plain_text || '';
+        const phone = props['Contact Phone']?.phone_number || null;
+        const dba = props['DBA']?.rich_text?.[0]?.plain_text || null;
+
+        // Parse address line from Full Address (e.g. "3162 Lake Rd Ste 4, Horseheads 14845")
+        const address1 = fullAddr.split(',')[0]?.trim() || '';
+        const address2 = null;
+        // Attempt to extract state from Region formula or default
+        const state = 'NY';
 
         // Pipeline Status logic
-        const rawStatus = props['Status']?.status?.name || 'INACTIVE';
-        const recordStatus = rawStatus === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE';
+        const rawStatus = props['PPP Status']?.status?.name || 'Not Started';
+        const recordStatus = rawStatus === 'Not Started' || rawStatus === 'Inactive' ? 'INACTIVE' : 'ACTIVE';
 
         // Notion provides last_edited_time ISO string
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -96,8 +101,8 @@ export async function GET(request: Request) {
           continue;
         }
 
-        // Full address compilation for Google
-        const fullAddress = `${address1} ${city}, ${state} ${zipcode}`.trim();
+        // Full address compilation for Google Geocoding
+        const geocodeAddress = fullAddr || `${address1} ${city}, ${state} ${zipcode}`.trim();
 
         let lat = existing?.latitude || null;
         let lng = existing?.longitude || null;
@@ -106,8 +111,8 @@ export async function GET(request: Request) {
         const addressChanged = existing &&
           (existing.address1 !== address1 || existing.city !== city || existing.zipcode !== zipcode);
 
-        if ((!existing && fullAddress.length > 5) || addressChanged) {
-          const coords = await safeGeocodeAddress(org.id, fullAddress);
+        if ((!existing && geocodeAddress.length > 5) || addressChanged) {
+          const coords = await safeGeocodeAddress(org.id, geocodeAddress);
           if (coords) {
             lat = coords.lat;
             lng = coords.lng;
