@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireTerritoryApiAccess } from '@/lib/auth/territory-access';
-import { loadTerritoryStores } from '@/lib/server/notion-territory';
+import { prisma as db } from '@/lib/db/prisma';
+import { colorForStatus, normalizeStatus } from '@/lib/territory/types';
+import type { TerritoryStorePin, TerritoryStoresResponse } from '@/lib/territory/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,45 +24,100 @@ export async function GET(request: Request) {
   const statuses = readMultiParam(searchParams, 'status');
   const reps = readMultiParam(searchParams, 'rep');
   const q = searchParams.get('q')?.trim() ?? '';
-  const refresh = searchParams.get('refresh') === '1';
 
   try {
-    const payload = await loadTerritoryStores({
-      statuses,
-      reps,
-      query: q,
-      refresh,
-    });
-
-    console.log('territory_stores_ok', {
-      recordsRead: payload.meta.recordsRead,
-      returned: payload.stores.length,
-      unresolvedLocationCount: payload.meta.unresolvedLocationCount,
-      geocodedThisRequest: payload.meta.geocodedThisRequest,
-      syncedAt: payload.meta.syncedAt,
-      stale: payload.meta.stale,
-      syncing: payload.meta.syncing,
-      refresh,
-    });
-
-    return NextResponse.json(payload, {
-      headers: {
-        'X-Territory-Data-Source': payload.meta.dataSource,
+    // Load directly from the pre-synced Neon database — instant, no Notion API calls
+    const accounts = await db.account.findMany({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null },
       },
+      select: {
+        id: true,
+        name: true,
+        licenseNumber: true,
+        address1: true,
+        city: true,
+        state: true,
+        zipcode: true,
+        phone: true,
+        status: true,
+        latitude: true,
+        longitude: true,
+        lastSyncedAt: true,
+      },
+      orderBy: { name: 'asc' },
     });
+
+    // Transform database accounts into TerritoryStorePin format
+    let stores: TerritoryStorePin[] = accounts
+      .filter((a) => a.latitude !== null && a.longitude !== null)
+      .map((account) => ({
+        id: account.id,
+        notionPageId: account.id,
+        name: account.name,
+        status: account.status,
+        statusKey: normalizeStatus(account.status),
+        statusColor: colorForStatus(account.status),
+        repNames: [],
+        repEmails: [],
+        lat: account.latitude!,
+        lng: account.longitude!,
+        locationLabel: account.name,
+        locationAddress: [account.address1, account.city, account.state, account.zipcode].filter(Boolean).join(', '),
+        locationSource: 'nominatim-cache' as const,
+        lastEditedTime: account.lastSyncedAt?.toISOString() ?? new Date().toISOString(),
+        licenseNumber: account.licenseNumber,
+        city: account.city,
+        state: account.state,
+        daysOverdue: null,
+      }));
+
+    // Apply filters
+    if (statuses.length > 0) {
+      const statusSet = new Set(statuses.map((s) => normalizeStatus(s)));
+      stores = stores.filter((pin) => statusSet.has(pin.statusKey));
+    }
+
+    if (q) {
+      const lowerQ = q.toLowerCase();
+      stores = stores.filter((pin) =>
+        pin.name.toLowerCase().includes(lowerQ) ||
+        (pin.licenseNumber?.toLowerCase().includes(lowerQ)) ||
+        (pin.city?.toLowerCase().includes(lowerQ))
+      );
+    }
+
+    // Build filter counts
+    const statusCounts = new Map<string, number>();
+    for (const pin of stores) {
+      statusCounts.set(pin.status, (statusCounts.get(pin.status) ?? 0) + 1);
+    }
+
+    const payload: TerritoryStoresResponse = {
+      stores,
+      filters: {
+        statuses: [...statusCounts.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => a.value.localeCompare(b.value)),
+        reps: [],
+      },
+      meta: {
+        dataSource: 'notion-live-cache',
+        lastEditedMax: null,
+        recordsRead: accounts.length,
+        unresolvedLocationCount: 0,
+        geocodedThisRequest: 0,
+        syncedAt: new Date().toISOString(),
+        stale: false,
+        syncing: false,
+        syncError: null,
+      },
+    };
+
+    return NextResponse.json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Territory store fetch failed';
-    console.error('territory_stores_error', { message, refresh, statusesCount: statuses.length, repsCount: reps.length, hasQuery: Boolean(q) });
-    return NextResponse.json(
-      {
-        error: message,
-      },
-      {
-        status: 500,
-        headers: {
-          'X-Territory-Data-Source': 'notion-live-cache',
-        },
-      },
-    );
+    console.error('territory_stores_error', { message });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
