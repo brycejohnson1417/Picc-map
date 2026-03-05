@@ -11,3 +11,4 @@ dist
 *.swp
 .vercel
 .env*.local
+dev.db

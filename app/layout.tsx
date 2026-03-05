@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
-import 'leaflet/dist/leaflet.css';
 import { Providers } from '@/components/layout/providers';
 import { DEMO_MODE } from '@/lib/config/runtime';
 

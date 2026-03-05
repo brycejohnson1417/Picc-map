@@ -87,7 +87,6 @@ export function TerritoryClient() {
   }, [routeState.orderedStopIds, selectedStops]);
 
   const orderedStopIds = orderedStops.map((stop) => stop.id);
-  const routeCoordinates = optimizedRoute?.geometry?.coordinates ?? [];
 
   const totalDurationSeconds = optimizedRoute?.totalDurationSeconds ?? 0;
   const totalDistanceMeters = optimizedRoute?.totalDistanceMeters ?? 0;
@@ -147,29 +146,19 @@ export function TerritoryClient() {
     }
   }
 
-  function handleLaunchTransit() {
-    if (orderedStops.length < 2) {
-      toast.error('Select at least 2 stops to launch transit directions.');
+  function handleLaunchNavigation(type: 'apple' | 'google') {
+    if (orderedStops.length < 1) {
+      toast.error('Select at least 1 stop to launch navigation.');
       return;
     }
 
-    const coordinateStrings = orderedStops.map((stop) => `${stop.lat},${stop.lng}`);
-    const origin = coordinateStrings[0];
-    const destination = coordinateStrings[coordinateStrings.length - 1];
-    const waypoints = coordinateStrings.slice(1, -1).join('|');
+    const dest = orderedStops[orderedStops.length - 1];
 
-    const params = new URLSearchParams({
-      api: '1',
-      travelmode: 'transit',
-      origin,
-      destination,
-    });
-
-    if (waypoints) {
-      params.set('waypoints', waypoints);
+    if (type === 'apple') {
+      window.open(`http://maps.apple.com/?daddr=${dest.lat},${dest.lng}`, '_blank', 'noopener,noreferrer');
+    } else {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}`, '_blank', 'noopener,noreferrer');
     }
-
-    window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank', 'noopener,noreferrer');
   }
 
   if (storesQuery.isLoading) {
@@ -233,10 +222,8 @@ export function TerritoryClient() {
         <MapCanvas
           stores={stores}
           selectedStopIds={routeState.selectedStopIds}
-          orderedStopIds={orderedStopIds}
-          routeCoordinates={routeCoordinates}
           focusedStoreId={focusedStoreId}
-          onSelectStore={(storeId) => setFocusedStoreId(storeId)}
+          onSelectStore={(storeId: string) => setFocusedStoreId(storeId)}
         />
 
         {stores.length === 0 ? (
@@ -277,7 +264,7 @@ export function TerritoryClient() {
               resetRouteOptimization();
             }}
             onOptimize={handleOptimizeRoute}
-            onLaunchTransit={handleLaunchTransit}
+            onLaunchTransit={() => handleLaunchNavigation('google')}
             onRemoveStop={(storeId) => {
               setRouteState((current) => removeRouteStop(current, storeId));
               resetRouteOptimization();

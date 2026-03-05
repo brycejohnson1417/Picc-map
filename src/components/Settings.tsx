@@ -361,9 +361,10 @@ export const Settings: React.FC = () => {
               <>
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                   <div className="flex items-center gap-3">
-                    {notionBot?.icon && (
+                    {notionBot?.icon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={notionBot.icon} alt="Bot" className="w-10 h-10 rounded-full border border-slate-200 bg-white" onError={(event) => (event.currentTarget.style.display = 'none')} />
-                    )}
+                    ) : null}
                     <div>
                       <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
                         Connected as {notionBot?.name || 'Notion workspace'}
@@ -385,9 +386,8 @@ export const Settings: React.FC = () => {
                           type="button"
                           key={db.id}
                           onClick={() => handleSelectNotionDatabase(db.id)}
-                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-4 text-left ${
-                            notionDbId === db.id ? 'border-indigo-600 bg-indigo-50 shadow-sm' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
-                          }`}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-4 text-left ${notionDbId === db.id ? 'border-indigo-600 bg-indigo-50 shadow-sm' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                            }`}
                         >
                           <div className="text-2xl">{db.icon || '🗂️'}</div>
                           <div className="flex-1 min-w-0">

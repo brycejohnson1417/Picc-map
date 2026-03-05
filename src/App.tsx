@@ -173,11 +173,8 @@ const App: React.FC = () => {
 
     return () => {
       disposed = true;
-      if (existingScript) {
-        existingScript.removeEventListener('load', renderGoogleButton);
-      }
     };
-  }, [googleClientId, isAuthed, isSigningIn]);
+  }, [googleClientId, isAuthed, isSigningIn, handleGoogleCredential]);
 
   useEffect(() => {
     const allowed = roleNavIds[userRole];

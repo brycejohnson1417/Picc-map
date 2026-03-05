@@ -1,13 +1,16 @@
 import { requireWorkspaceContext } from '@/lib/auth/workspace';
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui';
 import { prisma } from '@/lib/db/prisma';
+import { getOrCreateSystemConfig } from '@/lib/integrations/google';
+import { BudgetTracker } from '@/components/settings/budget-tracker';
 
 export default async function SettingsPage() {
   const { orgId } = await requireWorkspaceContext();
 
-  const [memberships, integrations] = await Promise.all([
+  const [memberships, integrations, systemConfig] = await Promise.all([
     prisma.membership.findMany({ where: { orgId }, orderBy: { role: 'asc' } }),
     prisma.integrationConnection.findMany({ where: { orgId }, orderBy: { provider: 'asc' } }),
+    getOrCreateSystemConfig(orgId)
   ]);
 
   return (
@@ -16,6 +19,11 @@ export default async function SettingsPage() {
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-sm text-slate-500">Role sync, integration health, custom fields, and account-wide controls.</p>
       </header>
+
+      <BudgetTracker
+        googleGeocodingHits={systemConfig.googleGeocodingHits}
+        budgetLimit={systemConfig.budgetLimit}
+      />
 
       <Card>
         <CardHeader>

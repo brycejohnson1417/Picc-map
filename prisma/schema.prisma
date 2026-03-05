@@ -127,6 +127,7 @@ model OrganizationWorkspace {
   syncRuns        SyncRun[]
   importJobs      ImportJob[]
   exportJobs      ExportJob[]
+  systemConfig    SystemConfig?
 }
 
 model Membership {
@@ -157,6 +158,9 @@ model Account {
   zipcode               String
   phone                 String?
   status                RecordStatus                     @default(ACTIVE)
+  latitude              Float?
+  longitude             Float?
+  lastSyncedAt          DateTime?
   lastContactedAt       DateTime?
   createdAt             DateTime                         @default(now())
   updatedAt             DateTime                         @updatedAt
@@ -794,3 +798,16 @@ model SpatialGeocodeCache {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
+
+model SystemConfig {
+  id                  String                @id @default("singleton")
+  orgId               String                @unique
+  org                 OrganizationWorkspace @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  googleGeocodingHits Int                   @default(0)
+  budgetLimit         Int                   @default(100)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([orgId])
+}
+
