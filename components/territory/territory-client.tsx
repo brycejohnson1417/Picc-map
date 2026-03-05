@@ -86,8 +86,6 @@ export function TerritoryClient() {
     return routeState.orderedStopIds.map((id) => routeMap.get(id)).filter((stop): stop is TerritoryStorePin => Boolean(stop));
   }, [routeState.orderedStopIds, selectedStops]);
 
-  const orderedStopIds = orderedStops.map((stop) => stop.id);
-
   const totalDurationSeconds = optimizedRoute?.totalDurationSeconds ?? 0;
   const totalDistanceMeters = optimizedRoute?.totalDistanceMeters ?? 0;
 

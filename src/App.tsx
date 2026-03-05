@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { NotionDocList } from './components/NotionDocList';
@@ -99,7 +99,7 @@ const App: React.FC = () => {
     void loadGoogleConfig();
   }, []);
 
-  const handleGoogleCredential = async (credential: string): Promise<void> => {
+  const handleGoogleCredential = useCallback(async (credential: string): Promise<void> => {
     if (!credential || isSigningIn) return;
 
     setAuthError('');
@@ -124,7 +124,7 @@ const App: React.FC = () => {
     } finally {
       setIsSigningIn(false);
     }
-  };
+  }, [isSigningIn]);
 
   useEffect(() => {
     if (isAuthed || !googleClientId || !googleButtonRef.current) return;
