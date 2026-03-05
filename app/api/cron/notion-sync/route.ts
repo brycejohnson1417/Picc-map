@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
-import { Client } from '@notionhq/client';
 import { prisma as db } from '@/lib/db/prisma';
 import { safeGeocodeAddress } from '@/lib/integrations/google';
 import { env } from '@/lib/config/env';
 
 /**
  * Ensures a single mock organization exists to link accounts and system configs to.
- * In a real multi-tenant app, this would be derived from the user/Clerk session.
- * For cron/background tasks, we default to the primary PICC org.
  */
 async function getOrCreateRootOrg() {
   const orgId = 'picc_root_org';
@@ -25,13 +22,44 @@ async function getOrCreateRootOrg() {
   return org;
 }
 
-const notion = new Client({ auth: env.NOTION_API_KEY });
+/**
+ * Direct Notion REST API query (avoids SDK bundler issues on Vercel)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function queryNotionDatabase(databaseId: string, startCursor?: string): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body: any = {
+    page_size: 50,
+    filter: {
+      property: 'License Number',
+      rich_text: { is_not_empty: true }
+    }
+  };
+  if (startCursor) body.start_cursor = startCursor;
+
+  const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.NOTION_API_KEY}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Notion API error ${res.status}: ${text}`);
+  }
+
+  return res.json();
+}
 
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      // Optional: Add a simple secret protection so public can't spam the sync route
       console.warn('Unauthorized cron sync attempt');
     }
 
@@ -47,20 +75,8 @@ export async function GET(request: Request) {
     let totalSynced = 0;
     let newGeocodes = 0;
 
-    // We do cursor pagination to pull all valid accounts ensuring we never exceed limits
     while (hasMore) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response: any = await (notion.databases as any).query({
-        database_id: dbId,
-        start_cursor: cursor,
-        page_size: 50, // Notion limits to 100 max. 50 allows processing overhead
-        filter: {
-          property: 'License Number',
-          rich_text: {
-            is_not_empty: true
-          }
-        }
-      });
+      const response = await queryNotionDatabase(dbId, cursor);
 
       for (const record of response.results) {
         // Safe type casting for Notion's chaotic response structure
@@ -173,6 +189,8 @@ export async function GET(request: Request) {
 
   } catch (error) {
     console.error('Notion Sync Error:', error);
-    return NextResponse.json({ success: false, error: 'Internal sync error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    return NextResponse.json({ success: false, error: message, stack }, { status: 500 });
   }
 }
