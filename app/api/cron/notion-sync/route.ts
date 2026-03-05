@@ -89,7 +89,6 @@ export async function GET(request: Request) {
         const city = props['City']?.rich_text?.[0]?.plain_text || '';
         const zipcode = props['Zipcode']?.rich_text?.[0]?.plain_text || '';
         const phone = props['Contact Phone']?.phone_number || null;
-        const dba = props['DBA']?.rich_text?.[0]?.plain_text || null;
 
         // Parse address line from Full Address (e.g. "3162 Lake Rd Ste 4, Horseheads 14845")
         const address1 = fullAddr.split(',')[0]?.trim() || '';

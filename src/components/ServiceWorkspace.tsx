@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import type { UserRole, WorkOrder } from '../types';
 import { loadServiceCenterData } from '../services/moduleDataService';
@@ -47,19 +47,18 @@ export const ServiceWorkspace: React.FC<ServiceWorkspaceProps> = ({ currentUserR
 
   const isAwaitingSignOff = (row: WorkOrder): boolean => Boolean(row.requiresSignOff) && !row.signedOff;
 
-  const isMine = (row: WorkOrder): boolean => {
+  const isMine = useCallback((row: WorkOrder): boolean => {
     if (row.assignee === currentUserRole) return true;
     if (!row.assigneeName) return false;
     return row.assigneeName.toLowerCase().includes(currentUserRole.toLowerCase());
-  };
+  }, [currentUserRole]);
 
-  const priorityWeight: Record<WorkOrder['priority'], number> = {
-    High: 3,
-    Medium: 2,
-    Low: 1,
-  };
-
-  const urgencyScore = (row: WorkOrder): number => {
+  const urgencyScore = useCallback((row: WorkOrder): number => {
+    const priorityWeight: Record<WorkOrder['priority'], number> = {
+      High: 3,
+      Medium: 2,
+      Low: 1,
+    };
     let score = priorityWeight[row.priority];
     if (!isClosed(row.status)) score += 1;
     if (isFollowUp(row)) score += 2;
@@ -74,7 +73,7 @@ export const ServiceWorkspace: React.FC<ServiceWorkspaceProps> = ({ currentUserR
     }
 
     return score;
-  };
+  }, [now]);
 
   const dueLabel = (row: WorkOrder): { label: string; tone: string } => {
     const dueTs = toTimestamp(row.dueDate);
@@ -119,7 +118,7 @@ export const ServiceWorkspace: React.FC<ServiceWorkspaceProps> = ({ currentUserR
         if (dueA !== dueB) return dueA - dueB;
         return (toTimestamp(b.dateCreated) ?? 0) - (toTimestamp(a.dateCreated) ?? 0);
       });
-  }, [rows, search, statusFilter, laneFilter, now, isMine, urgencyScore]);
+  }, [rows, search, statusFilter, laneFilter, isMine, urgencyScore]);
 
   const statuses = useMemo(() => Array.from(new Set(rows.filter((row) => !isClosed(row.status)).map((row) => row.status))), [rows]);
 
@@ -130,9 +129,9 @@ export const ServiceWorkspace: React.FC<ServiceWorkspaceProps> = ({ currentUserR
         if (!isFollowUp(row)) return false;
         const dueTs = toTimestamp(row.dueDate);
         if (dueTs === null) return false;
-        return dueTs <= now.getTime();
+        return dueTs <= Date.now();
       }).length,
-    [openRows, now],
+    [openRows],
   );
   const awaitingSignOffCount = useMemo(() => openRows.filter((row) => isAwaitingSignOff(row)).length, [openRows]);
   const myQueueCount = useMemo(() => openRows.filter((row) => isMine(row)).length, [openRows, isMine]);

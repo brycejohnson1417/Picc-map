@@ -116,7 +116,7 @@ export const ProposalBuilder: React.FC = () => {
 
   const lineItems = useMemo((): ProposalLineItem[] => {
     return Object.entries(quantities)
-      .filter(([_, qty]) => (qty as number) > 0)
+      .filter(([, qty]) => (qty as number) > 0)
       .map(([productId, quantity]) => {
         const product = products.find(p => p.id === productId);
         if (!product) return null;
